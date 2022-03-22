@@ -2,37 +2,40 @@ package com.admc.jsonproxy
 
 import spock.lang.Specification
 
+/**
+ * These are tests without using Service.run or the JSON I/O pipe
+ */
 class CoreTest extends Specification {
-    @spock.lang.Shared PrintStream origSystemOut = System.out
-    @spock.lang.Shared InputStream origSystemIn = System.in
-    @spock.lang.Shared ByteArrayOutputStream baos = new ByteArrayOutputStream()
+    private Service service
 
     def setup() {
-        baos.reset()
-        System.setOut(new PrintStream(baos, true, 'UTF-8'))
+        service = new Service()
     }
 
     def cleanup() {
-        System.setOut origSystemOut
-        System.setIn origSystemIn
+        service = null
     }
 
-    def cleanupSpec() {
-        println 'You should see this stdout, proving that System.out is restored'
-    }
-
-    def "sanity"() {
-        setup:
-        System.setIn(new ByteArrayInputStream('"a string"'.getBytes('UTF-8')));
-        // can't inst. unil after setIn + setOut
-        final Service service = new Service()
-
+    def "instantiate"() {
         when:
-        service.run()
-        System.err.println baos.toString('UTF-8')
+        final String constRet =
+          service.instantiate('key1', 'java.lang.String', 'input str')
+        final int newSize = service.size()
 
         then:
-        service.size() == 1
-        baos.toString().startsWith('Got 10 bytes')
+        newSize == 1
+        service.get('key1') == 'input str'
+    }
+
+    def "staticCall"() {
+        when:
+        final String callRet =
+          service.staticCall('java.lang.String',
+            'format', '<%s> (%d)', ['werd', 345] as Object[])
+        final int newSize = service.size()
+
+        then:
+        newSize == 0
+        callRet == '<werd> (345)'
     }
 }
