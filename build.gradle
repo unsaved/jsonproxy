@@ -1,0 +1,68 @@
+defaultTasks 'installAnnouncement'
+
+// Set build properties in non-SCM-controlled file "gradle.properties" in
+// current directory (or your shared user-specific one).
+
+// TODO:  Exclude .* files from jars, zips, tars
+
+// Apply the java plugin to add support for Java
+apply plugin: 'application'
+apply plugin: 'groovy'
+
+//run.args = ['1', '3']
+
+sourceCompatibility = '1.11'
+//assert hasProperty('JAVA6_JRE_JAR')
+// FUCK trying to get rid of the boostrap lib warnings!
+// Have to compile in fork mode for bootClasspath settings to have any effect.
+//tasks.withType(Compile) {
+    //options.bootClasspath = project.property('JAVA6_JREversion '0.1-SNAPSHOT'
+project.ext.set('spec.version', '1.0')
+project.ext.set('org.name', 'Axis Data Management Corp')
+
+applicationDefaultJvmArgs = ['-ea']
+
+mainClassName = 'com.admc.jsonproxy.Service'
+
+repositories {
+    mavenCentral()
+}
+
+// In this section you declare the dependencies for your production and test code
+dependencies {
+    implementation  \
+      'org.codehaus.groovy:groovy:3.0.10',
+      'org.codehaus.groovy:groovy-json:3.0.10'
+      //'commons-io:commons-io:2.4',
+      //'com.google.code.gson:gson:2.6.2',
+      //'com.fasterxml.jackson.core:jackson-core:2.7.4',
+      //'com.fasterxml.jackson.core:jackson-databind:2.7.4',
+      //'com.fasterxml.jackson.core:jackson-annotations:2.7.4',
+    //testImplementation 'junit:junit:4.12'  use spock!
+}
+
+project.ext.set('rtLibs', null)
+jar { doFirst {
+    project.ext.set('rtLibs', [])
+    configurations.runtimeClasspath.files.each { project.rtLibs << it.name }
+    manifest {
+        attributes(
+            'Main-Class': mainClassName,
+            'Class-Path': project.rtLibs.join(' '),
+            'Specification-Title': archivesBaseName,
+            'Specification-Version': project.property('spec.version'),
+            'Specification-Vendor': 'Axis Data Management Corp.',
+            'Implementation-Title': archivesBaseName,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': project.property('org.name')
+        )
+    }
+} }
+
+processResources {
+    exclude '**/.*'
+}
+
+task installAnnouncement(dependsOn: installDist) { doLast {
+    println "To run:\n    build/install/$project.name/bin/$project.name"
+} }
