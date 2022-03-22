@@ -17,6 +17,10 @@ class CoreTest extends Specification {
         System.setIn origSystemIn
     }
 
+    def cleanupSpec() {
+        println 'You should see this stdout, proving that System.out is restored'
+    }
+
     def "sanity"() {
         setup:
         System.setIn(new ByteArrayInputStream('"a string"'.getBytes('UTF-8')));
@@ -30,24 +34,5 @@ class CoreTest extends Specification {
         then:
         service.size() == 1
         baos.toString().startsWith('Got 10 bytes')
-    }
-
-    def "sanity2"() {
-        setup:
-        System.setIn(new ByteArrayInputStream('"another string"'.getBytes('UTF-8')));
-        // can't inst. unil after setIn + setOut
-        final Service service = new Service()
-
-        when:
-        service.run()
-        System.err.println baos.toString('UTF-8')
-
-        then:
-        service.size() == 1
-        baos.toString().startsWith('Got 16 bytes')
-    }
-
-    def cleanupSpec() {
-        println 'You should see this stdout, proving that System.out is restored'
     }
 }
