@@ -2,7 +2,7 @@
 
 package com.admc.jsonproxy
 
-class StringDriver {
+class Service {
     static void main(String[] args) {
         List<String> argList = args
         println "Helo.  $argList.size args: $args"
