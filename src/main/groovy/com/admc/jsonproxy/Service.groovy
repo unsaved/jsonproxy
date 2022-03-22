@@ -2,11 +2,16 @@
 
 package com.admc.jsonproxy
 
+import com.admc.groovy.GroovyUtil
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
 class Service {
     private BufferedReader reader
     private OutputStreamWriter writer
-    char[] buffer
+    private char[] buffer
     static final CHAR_BUFFER_SIZE = 10240;
+    private JsonSlurper slurper
 
     static void main(String[] args) {
         /* Can't think of any execution option options, for now...
@@ -20,11 +25,17 @@ class Service {
         reader = new BufferedReader(new InputStreamReader(System.in, 'UTF-8'))
         writer = new OutputStreamWriter(System.out)
         buffer = new char[CHAR_BUFFER_SIZE]
+        slurper = new JsonSlurper()
     }
 
     void run() {
         int i
-        while ((i = reader.read(buffer, 0, buffer.length)) > 0)
+        def obj
+        while ((i = reader.read(buffer, 0, buffer.length)) > 0) {
             println "Got $i bytes: <${String.valueOf(buffer, 0, i)}>"
+            obj = slurper.parseText(String.valueOf(buffer, 0, i))
+            println "Reconstituted to a ${obj.getClass().name}"
+            println GroovyUtil.pretty(obj)
+        }
     }
 }
