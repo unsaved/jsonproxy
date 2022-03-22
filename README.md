@@ -6,6 +6,10 @@ Java service that servers JSON requests for class and object operations.
   1. An object identifier/reference (probably an integer or uuid of some sort TBD)
   1. A scalar, structured, or collection value
 
+Implementation language is Groovy.
+
+Build system is Gradle.
+
 # Installation
 The deliverable is a Java 11 jar file with entry point.
 One simple way to run the service is:
