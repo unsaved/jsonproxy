@@ -9,7 +9,7 @@ class CoreTest extends Specification {
 
     def setup() {
         baos.reset()
-        System.setOut(new PrintStream(baos, true, "UTF-8"))
+        System.setOut(new PrintStream(baos, true, 'UTF-8'))
     }
 
     def cleanup() {
@@ -19,13 +19,13 @@ class CoreTest extends Specification {
 
     def "sanity"() {
         setup:
-        System.setIn(new ByteArrayInputStream('"a string"'.getBytes("UTF-8")));
+        System.setIn(new ByteArrayInputStream('"a string"'.getBytes('UTF-8')));
         // can't inst. unil after setIn + setOut
         final Service service = new Service()
 
         when:
         service.run()
-        System.err.println baos.toString("UTF-8")
+        System.err.println baos.toString('UTF-8')
 
         then:
         service.size() == 1
@@ -34,13 +34,13 @@ class CoreTest extends Specification {
 
     def "sanity2"() {
         setup:
-        System.setIn(new ByteArrayInputStream('"another string"'.getBytes("UTF-8")));
+        System.setIn(new ByteArrayInputStream('"another string"'.getBytes('UTF-8')));
         // can't inst. unil after setIn + setOut
         final Service service = new Service()
 
         when:
         service.run()
-        System.err.println baos.toString("UTF-8")
+        System.err.println baos.toString('UTF-8')
 
         then:
         service.size() == 1
