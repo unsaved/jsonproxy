@@ -6,7 +6,7 @@ import com.admc.groovy.GroovyUtil
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 
-class Service {
+class Service extends HashMap {
     private BufferedReader reader
     private OutputStreamWriter writer
     private char[] buffer
@@ -36,6 +36,7 @@ class Service {
             obj = slurper.parseText(String.valueOf(buffer, 0, i))
             println "Reconstituted to a ${obj.getClass().name}"
             println GroovyUtil.pretty(obj)
+            put("1ststr", obj);
         }
     }
 }
