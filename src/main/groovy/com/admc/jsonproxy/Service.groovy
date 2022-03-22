@@ -21,6 +21,10 @@ class Service extends HashMap {
         System.exit 0
     }
 
+    /**
+     * System.in and System.out must be ready before this constructor
+     * executes
+     */
     Service() {
         reader = new BufferedReader(new InputStreamReader(System.in, 'UTF-8'))
         writer = new OutputStreamWriter(System.out)
@@ -33,6 +37,7 @@ class Service extends HashMap {
         def obj
         while ((i = reader.read(buffer, 0, buffer.length)) > 0) {
             println "Got $i bytes: <${String.valueOf(buffer, 0, i)}>"
+            System.err.println 'Service wrote to stdout'
             obj = slurper.parseText(String.valueOf(buffer, 0, i))
             println "Reconstituted to a ${obj.getClass().name}"
             println GroovyUtil.pretty(obj)
