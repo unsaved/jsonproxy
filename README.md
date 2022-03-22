@@ -1,10 +1,16 @@
 # Description
-Java service that servers JSON requests for class and object operations.
-* It reads JSON from stdin operations for object instantations and class and object methods
+Java service that serves JSON requests for class and object operations.
+It is also the repository of live objects created by the client.
+  
+* It reads JSON from stdin operations for
+  1. object instantations, providing a string key (handle/id) for the new object
+  1. class and object method invocations, specifying the class or the object key
+  1. object destruction.  Destroys object and removes from the repository
 * It writes JSON responses to these calls consisting of one of...
-  1. Null if the target method is a void method
-  1. An object identifier/reference (probably an integer or uuid of some sort TBD)
-  1. A scalar, structured, or collection value
+  1. Null if the target method is a void method, or if call was instantiate()
+     or destroy()
+  1. A scalar, structured, or collection value, being the return value of a
+     method invocation
 
 Implementation language is Groovy.
 
