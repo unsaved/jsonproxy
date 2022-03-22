@@ -8,6 +8,7 @@ import groovy.json.JsonOutput
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
+import java.lang.reflect.Field
 
 class Service extends HashMap {
     private BufferedReader reader
@@ -49,30 +50,85 @@ class Service extends HashMap {
     }
 
     /**
-     * Execute a static class method
+     * Execute a static class method.
      *
      * @param className
+     * @param methodName
      * @param methodParams
      * @returns method return value.  Null for void methods.
      */
-    def staticCall(final Object... args) {
-        final List<String> params = args
-        if (params.size() < 1)
-            throw new IllegalArgumentException('Service.instantiate '
+    private def staticCall(final Object... args) {
+        final List params = args
+        if (params.size() < 2)
+            throw new IllegalArgumentException('Service.staticCall '
               + 'requires at least 2 string param, className, methodName')
-        final String clName = params.remove 0
-        final String methodName = params.remove 0
-        final Class cl = Class.forName clName
+        _call(Class.forName(params.remove(0)), null, params.remove(0), params)
+    }
+
+    /**
+     * Execute an instance method.
+     *
+     * @param instanceKey
+     * @param methodName
+     * @param methodParams
+     * @returns method return value.  Null for void methods.
+     */
+    private def call(final Object... args) {
+        final List params = args
+        if (params.size() < 2)
+            throw new IllegalArgumentException('Service.call '
+              + 'requires at least 2 string param, instanceKey, methodName')
+        String key = params.remove 0
+        final Object inst = get key
+        if (inst == null)
+            throw new IllegalArgumentException(
+              "We have no instance with key '$key'")
+        _call(inst.getClass(), inst, params.remove(0), params)
+    }
+
+    /**
+     * Execute a method, static or instance.
+     *
+     * @param className
+     * @param methodName
+     * @param methodParams
+     * @returns method return value.  Null for void methods.
+     */
+    private def _call(final Class cl, final Object inst,
+    final String methodName, final List<Object> params) {
         System.err.println "Got class $cl.name"
-        final List<Class> pTypes = params.collect() { it.getClass().name }
-        final Method meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
-//final Method meth = cl.getMethod(methodName, [String.class, Object.class, Object.class] as Class[])
+        List<Class> pTypes = params.collect() { it.getClass() }
+        Method meth
+        try {
+            meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
+        } catch(NoSuchMethodException nsme) {
+             //Purposefully empty
+        }
+        if (meth == null) {
+            System.err.println 'Trying fallback meth signatures'
+            boolean anyChanged
+            pTypes = pTypes.collect() {
+                Field f
+                try {
+                    f = it.getField 'TYPE'
+                } catch(NoSuchFieldException nsfe) {
+                    return it
+                }
+                //Modifier.isStatic(f.modifiers) ? it.TYPE : it
+                if (!Modifier.isStatic(f.modifiers)) return it
+                anyChanged = true
+                return it.TYPE
+            }
+            if (!anyChanged)
+                throw new NoSuchMethodException(
+                  "Specified meth signature not found for $cl.name")
+            meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
+        }
         System.err.println "Got method ${cl.name}.$meth.name"
-        if (!Modifier.isStatic(meth.modifiers))
+        if (inst == null && !Modifier.isStatic(meth.modifiers))
             throw new IllegalArgumentException(
               "Method is not static: meth.name")
-        return meth.invoke(null, params as Object[])
-        //put(key, cons.newInstance(params as Object[]))
+        meth.invoke(inst, params as Object[])
     }
 
     /**
@@ -91,11 +147,43 @@ class Service extends HashMap {
         final String key = params.remove 0
         final String clName = params.remove 0
         final Class cl = Class.forName clName
-        final List<Class> pTypes = params.collect() { it.getClass().name }
-        final Constructor cons = cl.getDeclaredConstructor(pTypes as Class[])
+        List<Class> pTypes = params.collect() { it.getClass() }
+        Constructor cons
+        try {
+            cons = cl.getDeclaredConstructor(pTypes as Class[])
+        } catch(NoSuchMethodException nsme) {
+             //Purposefully empty
+        }
+        if (cons == null) {
+            System.err.println 'Trying fallback cons signatures'
+            boolean anyChanged
+            pTypes = pTypes.collect() {
+                Field f
+                try {
+                    f = it.getField 'TYPE'
+                } catch(NoSuchFieldException nsfe) {
+                    return it
+                }
+                //Modifier.isStatic(f.modifiers) ? it.TYPE : it
+                if (!Modifier.isStatic(f.modifiers)) return it
+                anyChanged = true
+                return it.TYPE
+            }
+            if (!anyChanged)
+                throw new NoSuchMethodException(
+                  "Specified cons signature not found for $clName")
+            cons = cl.getDeclaredConstructor(pTypes as Class[])
+        }
         System.err.println "Got class $cl.name"
         put(key, cons.newInstance(params as Object[]))
     }
 
-    //public int size() { keySet().size() }
+    /**
+     * Overwrite HashMap.remove to return null.
+     * For one thing we don't want to encourage caller from holding a
+     * reference and possibly causing memory leak.
+     * For another, our intended client can't use our map values.
+     * ... hm, should override other 'value' methods too.
+     */
+    Object remove(Object key) { super.remove key; null }
 }

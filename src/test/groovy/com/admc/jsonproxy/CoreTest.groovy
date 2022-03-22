@@ -19,12 +19,12 @@ class CoreTest extends Specification {
     def "instantiate"() {
         when:
         final String constRet =
-          service.instantiate('key1', 'java.lang.String', 'input str')
-        final int newSize = service.size()
+          service.instantiate('key1', 'java.util.Date', 123456789L)
 
         then:
-        newSize == 1
-        service.get('key1') == 'input str'
+        service.size() == 1
+        constRet == null
+        service.get('key1').time == 123456789L
     }
 
     def "staticCall"() {
@@ -32,10 +32,38 @@ class CoreTest extends Specification {
         final String callRet =
           service.staticCall('java.lang.String',
             'format', '<%s> (%d)', ['werd', 345] as Object[])
-        final int newSize = service.size()
 
         then:
-        newSize == 0
+        service.size() == 0
         callRet == '<werd> (345)'
+    }
+
+    def "call"() {
+        when:
+        final String constRet =
+          service.instantiate('key1', 'java.lang.String', 'input str')
+
+        then:
+        service.size() == 1
+        constRet == null
+        service.call('key1', 'substring', 3, 7) == 'ut s'
+    }
+
+    def "remove"() {
+        when:
+        final String constRet =
+          service.instantiate('key1', 'java.lang.String', 'input str')
+
+        then:
+        service.size() == 1
+        constRet == null
+        service.get('key1') == 'input str'
+
+        when:
+        Object rmVal = service.remove 'key1'
+
+        then:
+        rmVal == null
+        service.size() == 0
     }
 }
