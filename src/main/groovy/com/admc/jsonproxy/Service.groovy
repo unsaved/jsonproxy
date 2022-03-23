@@ -5,45 +5,50 @@ package com.admc.jsonproxy
 import com.admc.groovy.GroovyUtil
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
+import groovy.json.JsonException
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Field
 
-class Service extends HashMap {
+class Service extends HashMap implements Runnable {
     private BufferedReader reader
     private OutputStreamWriter writer
-    private char[] buffer
     static final CHAR_BUFFER_SIZE = 10240
-    private JsonSlurper slurper
+    private JsonSlurper slurper = new JsonSlurper()
 
     static void main(String[] args) {
         /* Can't think of any execution option options, for now...
         List<String> argList = args
         println "Helo.  $argList.size args: $args" */
-        new Service().run()
-        System.exit 0
+        new Service().serve()
     }
 
     /**
-     * System.in and System.out must be ready before this constructor
+     * System.in and System.out must be ready before this method
      * executes
      */
-    Service() {
+    void serve() {
         reader = new BufferedReader(new InputStreamReader(System.in, 'UTF-8'))
         writer = new OutputStreamWriter(System.out)
-        buffer = new char[CHAR_BUFFER_SIZE]
-        slurper = new JsonSlurper()
+        new Thread(this).start()
+        System.err.println 'started'
     }
 
     void run() {
+        System.err.println 'serve start'
+        final char[] buffer = new char[CHAR_BUFFER_SIZE]
         int i
         def obj
-        String jsonString
         Set inputKeys, requiredKeys
         List deNestedListParams
         while ((i = reader.read(buffer, 0, buffer.length)) > 0) {
-            obj = slurper.parseText(String.valueOf(buffer, 0, i))
+            try {
+                obj = slurper.parseText(String.valueOf(buffer, 0, i))
+            } catch(JsonException je) {
+                System.err.println "Input not JSON: $je.message"
+                continue
+            }
             if (obj !instanceof Map)
                 throw new RuntimeException(
                     "Input JSON reconstituted to a ${obj.getClass().name}")
@@ -71,9 +76,7 @@ class Service extends HashMap {
                 obj.params.add 0, obj['class']
                 obj.params.add 0, obj.key
                 instantiate(obj.params as Object[])
-                jsonString = JsonOutput.toJson null
-                writer.write jsonString, 0, jsonString.length()
-                writer.flush()
+                writer.write JsonOutput.toJson(null)
                 break
               case 'staticCall':
                 requiredKeys = ['op', 'class', 'params'] as Set
@@ -93,10 +96,8 @@ class Service extends HashMap {
                 deNestedListParams = obj.params.collect() {
                     (it instanceof List) ? (it as Object[]) : it
                 }
-                jsonString = JsonOutput.toJson(
+                writer.write JsonOutput.toJson(
                   staticCall(deNestedListParams as Object[]))
-                writer.write jsonString, 0, jsonString.length()
-                writer.flush()
                 break
               case 'call':
                 requiredKeys = ['op', 'key', 'params'] as Set
@@ -116,15 +117,57 @@ class Service extends HashMap {
                 deNestedListParams = obj.params.collect() {
                     (it instanceof List) ? (it as Object[]) : it
                 }
-                jsonString = JsonOutput.toJson(
+                writer.write JsonOutput.toJson(
                   call(deNestedListParams as Object[]))
-                writer.write jsonString, 0, jsonString.length()
-                writer.flush()
+                break
+              case 'contains':
+                requiredKeys = ['op', 'key', 'class'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj.key !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string key: $obj.key")
+                if (obj['class'] !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string class: ${obj['class']}")
+                writer.write JsonOutput.toJson(contains(obj.key, obj['class']))
+                break
+              case 'remove':
+                requiredKeys = ['op', 'key', 'class'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj.key !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string key: $obj.key")
+                if (obj['class'] !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string class: ${obj['class']}")
+                remove obj.key, obj['class']
+                writer.write JsonOutput.toJson(null)
+                break
+              case 'size':
+                requiredKeys = ['op'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                writer.write JsonOutput.toJson(size())
                 break
               default:
                 throw new RuntimeException("Unexpected operation: $obj.op")
             }
+            writer.flush()
+            System.err.println 'server flushed'
         }
+        writer.close()
+        System.err.println 'serve end'
     }
 
     /**

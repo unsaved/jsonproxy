@@ -1,0 +1,15 @@
+Re-learn JAVA JSON encoding and decoding
+
+Learn whether JAVA JSON decoding extracts lists to Arrays or Lists;
+and whether ints and floats become primitives or Objects.
+
+Get Java compilation working in project
+
+See if can call Java method from Groovy and get back generated primitive
+real arrays and real primitive values as array elements and map entry values
+
+Depending findings above, translate some or all of Service class into Java
+
+Implement JDK logging.  Must log to stderr or log files (i.e. not stdout)
+
+Make a unit test just like IOPipeTest that does JDBC operations
