@@ -39,13 +39,91 @@ class Service extends HashMap {
     void run() {
         int i
         def obj
+        String jsonString
+        Set inputKeys, requiredKeys
+        List deNestedListParams
         while ((i = reader.read(buffer, 0, buffer.length)) > 0) {
-            println "Got $i bytes: <${String.valueOf(buffer, 0, i)}>"
-            System.err.println 'Service wrote to stdout'
             obj = slurper.parseText(String.valueOf(buffer, 0, i))
-            println "Reconstituted to a ${obj.getClass().name}"
-            println GroovyUtil.pretty(obj)
-            put '1ststr', obj
+            if (obj !instanceof Map)
+                throw new RuntimeException(
+                    "Input JSON reconstituted to a ${obj.getClass().name}")
+            if (!('op' in obj.keySet()))
+                throw new RuntimeException(
+                    'Input JSON contains no .op (Operation) value')
+            //println GroovyUtil.pretty(obj)
+            switch (obj.op) {
+              case 'instantiate':
+                requiredKeys = ['op', 'key', 'class', 'params'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj.key !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string key: $obj.key")
+                if (obj['class'] !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string class: ${obj['class']}")
+                if (obj.params !instanceof List)
+                    throw new RuntimeException(
+                      "Input JSON contains non-List params: $obj.params")
+                obj.params.add 0, obj['class']
+                obj.params.add 0, obj.key
+                instantiate(obj.params as Object[])
+                jsonString = JsonOutput.toJson null
+                writer.write jsonString, 0, jsonString.length()
+                writer.flush()
+                break
+              case 'staticCall':
+                requiredKeys = ['op', 'class', 'params'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj['class'] !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string class: ${obj['class']}")
+                if (obj.params !instanceof List)
+                    throw new RuntimeException(
+                      "Input JSON contains non-List params: $obj.params")
+                obj.params.add 0, obj['class']
+                System.err.println 'Need to find element type here'
+                deNestedListParams = obj.params.collect() {
+                    (it instanceof List) ? (it as Object[]) : it
+                }
+                jsonString = JsonOutput.toJson(
+                  staticCall(deNestedListParams as Object[]))
+                writer.write jsonString, 0, jsonString.length()
+                writer.flush()
+                break
+              case 'call':
+                requiredKeys = ['op', 'key', 'params'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj.key !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string key: $obj.key")
+                if (obj.params !instanceof List)
+                    throw new RuntimeException(
+                      "Input JSON contains non-List params: $obj.params")
+                obj.params.add 0, obj.key
+                System.err.println 'Need to find element type here'
+                deNestedListParams = obj.params.collect() {
+                    (it instanceof List) ? (it as Object[]) : it
+                }
+                jsonString = JsonOutput.toJson(
+                  call(deNestedListParams as Object[]))
+                writer.write jsonString, 0, jsonString.length()
+                writer.flush()
+                break
+              default:
+                throw new RuntimeException("Unexpected operation: $obj.op")
+            }
         }
     }
 
@@ -105,6 +183,7 @@ class Service extends HashMap {
              //Purposefully empty
         }
         if (meth == null) {
+System.err.println 'Copy the fallback signature tpe checks to here'
             System.err.println 'Trying fallback meth signatures'
             boolean anyChanged
             pTypes = pTypes.collect() {
@@ -120,8 +199,8 @@ class Service extends HashMap {
                 return it.TYPE
             }
             if (!anyChanged)
-                throw new NoSuchMethodException(
-                  "Specified meth signature not found for $cl.name")
+                throw new NoSuchMethodException('Specified meth signature '
+                  + "not found for $cl.name: $pTypes")
             meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
         }
         System.err.println "Got method ${cl.name}.$meth.name"
@@ -147,16 +226,59 @@ class Service extends HashMap {
         final String key = params.remove 0
         final String clName = params.remove 0
         final Class cl = Class.forName clName
-        List<Class> pTypes = params.collect() { it.getClass() }
+        final List<Class> origPTypes = params.collect() { it.getClass() }
+        List<Class> pTypes
         Constructor cons
+        boolean anyChanged
         try {
-            cons = cl.getDeclaredConstructor(pTypes as Class[])
+            cons = cl.getDeclaredConstructor(origPTypes as Class[])
         } catch(NoSuchMethodException nsme) {
              //Purposefully empty
         }
         if (cons == null) {
-            System.err.println 'Trying fallback cons signatures'
-            boolean anyChanged
+            System.err.println 'Trying primitivized cons signatures'
+            anyChanged = false
+            pTypes = origPTypes.collect() {
+                Field f
+                try {
+                    f = it.getField 'TYPE'
+                } catch(NoSuchFieldException nsfe) {
+                    return it
+                }
+                //Modifier.isStatic(f.modifiers) ? it.TYPE : it
+                if (!Modifier.isStatic(f.modifiers)) return it
+                anyChanged = true
+                return it.TYPE
+            }
+            if (anyChanged) try {
+                cons = cl.getDeclaredConstructor(pTypes as Class[])
+            } catch(NoSuchMethodException nsme) {
+                 //Purposefully empty
+            }
+        }
+        if (cons == null) {
+            System.err.println 'Trying larger type cons signatures'
+            anyChanged = false
+            pTypes = origPTypes.collect() {
+                if (it == Integer.class) {
+                    anyChanged = true
+                    return Long.class
+                }
+                if (it == Float.class) {
+                    anyChanged = true
+                    return Double.class
+                }
+                it
+            }
+            if (anyChanged) try {
+                cons = cl.getDeclaredConstructor(pTypes as Class[])
+            } catch(NoSuchMethodException nsme) {
+                 //Purposefully empty
+            }
+        }
+        if (cons == null) {
+            System.err.println 'Trying primitivized larger type cons signatures'
+            anyChanged = false
             pTypes = pTypes.collect() {
                 Field f
                 try {
@@ -174,7 +296,6 @@ class Service extends HashMap {
                   "Specified cons signature not found for $clName")
             cons = cl.getDeclaredConstructor(pTypes as Class[])
         }
-        System.err.println "Got class $cl.name"
         put(key, cons.newInstance(params as Object[]))
     }
 
@@ -186,4 +307,18 @@ class Service extends HashMap {
      * ... hm, should override other 'value' methods too.
      */
     Object remove(Object key) { super.remove key; null }
+
+    boolean contains(String key, String cName) {
+        final def inst = get key
+        inst != null && Class.forName(cName).isInstance(inst)
+    }
+
+    /**
+     * Remove with type-validation
+     */
+    void remove(final String key, final String cName) {
+        if (!contains(key, cName))
+            throw new RuntimeException('No such instance in repository')
+        this.remove key
+    }
 }

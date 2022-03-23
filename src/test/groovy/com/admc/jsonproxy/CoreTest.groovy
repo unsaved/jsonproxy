@@ -60,7 +60,7 @@ class CoreTest extends Specification {
         service.get('key1') == 'input str'
 
         when:
-        Object rmVal = service.remove 'key1'
+        Object rmVal = service.remove 'key1', 'java.lang.String'
 
         then:
         rmVal == null
