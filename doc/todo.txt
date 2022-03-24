@@ -1,11 +1,10 @@
-Implement @ only for real method param substition of instances
-
 Implement an error response protocol
 
 Re-learn JAVA JSON encoding and decoding
 
 Learn whether JAVA JSON decoding extracts lists to Arrays or Lists;
 and whether ints and floats become primitives or Objects.
+Incl. what Groovy gets as input params, incl for: static void main.
 
 Get Java compilation working in project
 

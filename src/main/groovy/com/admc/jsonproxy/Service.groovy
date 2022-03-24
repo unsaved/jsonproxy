@@ -75,7 +75,7 @@ class Service extends HashMap implements Runnable {
                       "Input JSON contains non-List params: $obj.params")
                 if (containsKey(obj.key))
                     throw new RuntimeException('Repository already contains '
-                      + "an instance with key ${obj.key}")
+                      + "an instance with key $obj.key")
                 obj.params.add 0, obj['class']
                 obj.params.add 0, obj.key
                 instantiate(obj.params as Object[])
@@ -210,6 +210,50 @@ class Service extends HashMap implements Runnable {
         _call(inst.getClass(), inst, params.remove(0), params)
     }
 
+    private List<Object> dereference(final List<Object> inParams) {
+        // Only going 1 level deep for now
+        System.err.println 'Do a true recursive dereferencing'
+        Object inst
+        inParams.collect() {
+            if (it instanceof Map) return it.collectEntries() {
+                if ((it.value !instanceof String) || !it.value.startsWith('@'))
+                    return [it.key, it.value]
+                inst = get it.value.substring(1)
+                if (inst == null)
+                    throw new RuntimeException(
+                      "Unsatisfied reference '$it.value' in param list")
+                [it.key, inst]
+            }
+            if (it instanceof List) return it.collect() {
+                if ((it !instanceof String) || !it.startsWith('@')) return it
+                inst = get it.substring(1)
+                if (inst == null)
+                    throw new RuntimeException(
+                      "Unsatisfied reference '$it' in param list")
+                inst
+            }
+            if (it.getClass().isArray()) {
+                for (int i in 0..it.length-1) {
+                    if ((it[i] !instanceof String)
+                      || !it[i].startsWith('@')) continue
+                    inst = get it[i].substring(1)
+                    if (inst == null)
+                        throw new RuntimeException(
+                          "Unsatisfied reference '${it[i]}' in param list")
+                    it[i] = inst
+                }
+                return it
+            }
+            if ((it !instanceof String) || !it.startsWith('@'))
+                return it
+            inst = get it.substring(1)
+            if (inst == null)
+                throw new RuntimeException(
+                  "Unsatisfied reference '$it' in param list")
+            inst
+        }
+    }
+
     /**
      * Execute a method, static or instance.
      *
@@ -219,7 +263,8 @@ class Service extends HashMap implements Runnable {
      * @returns method return value.  Null for void methods.
      */
     private def _call(final Class cl, final Object inst,
-    final String methodName, final List<Object> params) {
+    final String methodName, final List<Object> inParams) {
+        final List<Object> params = dereference inParams
         System.err.println "Got class $cl.name"
         List<Class> pTypes = params.collect() { it.getClass() }
         Method meth

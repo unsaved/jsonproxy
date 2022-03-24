@@ -143,6 +143,38 @@ class IOPipe extends Specification {
         obj == '<werd> (345)'
     }
 
+    def "@reference"() {
+        def obj
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'instantiate',
+            key: 'date',
+            'class': 'java.util.Date',
+            params: [1000000000000]
+        ])
+        writer.flush()
+        obj = readObj()
+
+        then:
+        service.size() == 1
+        obj == null
+        service.contains 'date', 'java.util.Date'
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'staticCall',
+            'class': 'java.lang.String',
+            params: ['format', 'Today is %tB %<te', ['@date']]
+        ]);
+        writer.flush()
+        obj = readObj()
+
+        then:
+        service.size() == 1
+        obj == 'Today is September 8'
+    }
+
     def "call+contains"() {
         def obj
 
