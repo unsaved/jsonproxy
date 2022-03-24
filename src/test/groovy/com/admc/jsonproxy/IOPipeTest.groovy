@@ -63,7 +63,9 @@ class IOPipe extends Specification {
         println 'You should see this stdout, proving that System.out is restored'
     }
 
-    def "instantiate"() {
+    def "instantiate+get"() {
+        def obj
+
         when:
         writer.write JsonOutput.toJson([
             op: 'instantiate',
@@ -72,12 +74,24 @@ class IOPipe extends Specification {
             params: [123456789]
         ])
         writer.flush()
-        def obj = readObj()
+        obj = readObj()
 
         then:
         service.size() == 1
         obj == null
         service.contains 'key1', 'java.util.Date'
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'get',
+            key: 'key1',
+            'class': 'java.util.Date',
+        ])
+        writer.flush()
+        obj = readObj()
+
+        then:
+        obj == '1970-01-02T10:17:36+0000'
     }
 
     def "remove+size"() {
@@ -140,6 +154,36 @@ class IOPipe extends Specification {
 
         then:
         service.size() == 0
+        obj == '<werd> (345)'
+    }
+
+    def "staticCallPut"() {
+        def obj
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'staticCallPut',
+            'class': 'java.lang.String',
+            params: ['format', '<%s> (%d)', ['werd', 345]],
+            newKey: 'output'
+        ]);
+        writer.flush()
+        obj = readObj()
+
+        then:
+        service.size() == 1
+        obj == null
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'get',
+            'class': 'java.lang.String',
+            key: 'output'
+        ]);
+        writer.flush()
+        obj = readObj()
+
+        then:
         obj == '<werd> (345)'
     }
 
@@ -223,6 +267,50 @@ class IOPipe extends Specification {
         writer.write JsonOutput.toJson([
             op: 'contains',
             key: 'key1',
+            'class': 'java.lang.String',
+        ]);
+        writer.flush()
+        obj = readObj()
+
+        then:
+        obj == true
+    }
+
+    def "callPut+contains"() {
+        def obj
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'instantiate',
+            key: 'key1',
+            'class': 'java.lang.String',
+            params: ['input str']
+        ])
+        writer.flush()
+        obj = readObj()
+
+        then:
+        service.size() == 1
+        obj == null
+        service.contains 'key1', 'java.lang.String'
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'callPut',
+            key: 'key1',
+            newKey: 'out',
+            params: ['substring', 3, 7],
+        ]);
+        writer.flush()
+        obj = readObj()
+
+        then:
+        obj == null
+
+        when:
+        writer.write JsonOutput.toJson([
+            op: 'contains',
+            key: 'out',
             'class': 'java.lang.String',
         ]);
         writer.flush()

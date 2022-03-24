@@ -102,6 +102,54 @@ class Service extends HashMap implements Runnable {
                 writer.write JsonOutput.toJson(
                   staticCall(deNestedListParams as Object[]))
                 break
+              case 'staticCallPut':
+                requiredKeys = ['op', 'class', 'params', 'newKey'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj['class'] !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string class: ${obj['class']}")
+                if (obj.params !instanceof List)
+                    throw new RuntimeException(
+                      "Input JSON contains non-List params: $obj.params")
+                if (obj.newKey !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string newKey: $obj.newKey")
+                obj.params.add 0, obj['class']
+                System.err.println 'Need to find element type here'
+                deNestedListParams = obj.params.collect() {
+                    (it instanceof List) ? (it as Object[]) : it
+                }
+                put obj.newKey, staticCall(deNestedListParams as Object[])
+                writer.write JsonOutput.toJson(null)
+                break
+              case 'callPut':
+                requiredKeys = ['op', 'key', 'params', 'newKey'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj.key !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string key: $obj.key")
+                if (obj.params !instanceof List)
+                    throw new RuntimeException(
+                      "Input JSON contains non-List params: $obj.params")
+                if (obj.newKey !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string newKey: $obj.newKey")
+                obj.params.add 0, obj.key
+                System.err.println 'Need to find element type here'
+                deNestedListParams = obj.params.collect() {
+                    (it instanceof List) ? (it as Object[]) : it
+                }
+                put obj.newKey, call(deNestedListParams as Object[])
+                writer.write JsonOutput.toJson(null)
+                break
               case 'call':
                 requiredKeys = ['op', 'key', 'params'] as Set
                 inputKeys = obj.keySet()
@@ -137,6 +185,22 @@ class Service extends HashMap implements Runnable {
                     throw new RuntimeException(
                       "Input JSON contains non-string class: ${obj['class']}")
                 writer.write JsonOutput.toJson(contains(obj.key, obj['class']))
+                break
+              case 'get':
+                requiredKeys = ['op', 'key', 'class'] as Set
+                inputKeys = obj.keySet()
+                if (requiredKeys != inputKeys)
+                    throw new RuntimeException(
+                      "Input '$obj.op' JSON has keys $inputKeys "
+                      + "instead of $requiredKeys")
+                if (obj.key !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string key: $obj.key")
+                if (obj['class'] !instanceof String)
+                    throw new RuntimeException(
+                      "Input JSON contains non-string class: ${obj['class']}")
+System.err.println('Will write: ' + JsonOutput.toJson(get(obj.key, obj['class'])));
+                writer.write JsonOutput.toJson(get(obj.key, obj['class']))
                 break
               case 'remove':
                 requiredKeys = ['op', 'key', 'class'] as Set
@@ -402,6 +466,14 @@ System.err.println 'Copy the fallback signature type checks to here'
     boolean contains(String key, String cName) {
         final def inst = get key
         inst != null && Class.forName(cName).isInstance(inst)
+    }
+
+    Object get(String key, String cName) {
+        final def inst = get key
+        if (inst == null) throw new RuntimeException("No such key '$key'")
+        if (!Class.forName(cName).isInstance(inst))
+            throw new RuntimeException("Instance '$key' is not a $cName")
+        inst
     }
 
     /**
