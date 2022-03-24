@@ -73,6 +73,9 @@ class Service extends HashMap implements Runnable {
                 if (obj.params !instanceof List)
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
+                if (containsKey(obj.key))
+                    throw new RuntimeException('Repository already contains '
+                      + "an instance with key ${obj.key}")
                 obj.params.add 0, obj['class']
                 obj.params.add 0, obj.key
                 instantiate(obj.params as Object[])
