@@ -351,12 +351,36 @@ System.err.println 'Copy the fallback signature type checks to here'
                 //Modifier.isStatic(f.modifiers) ? it.TYPE : it
                 if (!Modifier.isStatic(f.modifiers)) return it
                 anyChanged = true
-                return it.TYPE
+                it.TYPE
+            }
+            if (!anyChanged) {
+                System.err.println 'Trying Obj[]->Str[]'
+                pTypes = pTypes.collect() {
+                    if (it != Object[].class) return it
+                    anyChanged = true
+                    String[].class
+                }
             }
             if (!anyChanged)
                 throw new NoSuchMethodException('Specified meth signature '
-                  + "not found for $cl.name: $pTypes")
-            meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
+                  + "not found for ${cl.name}.$methodName: $pTypes")
+            try {
+                meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
+            } catch (NoSuchMethodException) {
+                System.err.println(
+                  "Trying last ditch effort since failing to find ${cl.name}.$methodName: $pTypes")
+                final matchingMethods = cl.getDeclaredMethods().findAll() {
+                    it.name == methodName && it.parameterCount == params.size()
+                }
+                if (matchingMethods.size() != 1)
+                    throw new NoSuchMethodException(matchingMethods.size()
+                      + " matches for meth signature ${cl.name}.$methodName: $pTypes")
+                meth = matchingMethods[0]
+System.err.println 'Empoloying severe hack'
+// When get IllegalArgument Exception with text "argument type mismatch",
+// need to auto cast array and lists to the declaration array/list types.
+params[3] = (String[]) params[3]
+            }
         }
         System.err.println "Got method ${cl.name}.$meth.name"
         if (inst == null && !Modifier.isStatic(meth.modifiers))
@@ -403,7 +427,7 @@ System.err.println 'Copy the fallback signature type checks to here'
                 //Modifier.isStatic(f.modifiers) ? it.TYPE : it
                 if (!Modifier.isStatic(f.modifiers)) return it
                 anyChanged = true
-                return it.TYPE
+                it.TYPE
             }
             if (anyChanged) try {
                 cons = cl.getDeclaredConstructor(pTypes as Class[])
@@ -444,7 +468,7 @@ System.err.println 'Copy the fallback signature type checks to here'
                 //Modifier.isStatic(f.modifiers) ? it.TYPE : it
                 if (!Modifier.isStatic(f.modifiers)) return it
                 anyChanged = true
-                return it.TYPE
+                it.TYPE
             }
             if (!anyChanged)
                 throw new NoSuchMethodException(
