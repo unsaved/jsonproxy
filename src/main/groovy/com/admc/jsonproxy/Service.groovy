@@ -229,7 +229,7 @@ class Service extends HashMap implements Runnable {
              //Purposefully empty
         }
         if (meth == null) {
-System.err.println 'Copy the fallback signature tpe checks to here'
+System.err.println 'Copy the fallback signature type checks to here'
             System.err.println 'Trying fallback meth signatures'
             boolean anyChanged
             pTypes = pTypes.collect() {
