@@ -2,6 +2,7 @@
 
 package com.admc.jsonproxy
 
+import java.util.logging.Level
 import com.admc.groovy.GroovyUtil
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
@@ -11,6 +12,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Field
 
+@groovy.util.logging.Log(value='logger')
 class Service extends HashMap implements Runnable {
     private BufferedReader reader
     private OutputStreamWriter writer
@@ -18,9 +20,7 @@ class Service extends HashMap implements Runnable {
     private JsonSlurper slurper = new JsonSlurper()
 
     static void main(String[] args) {
-        /* Can't think of any execution option options, for now...
-        List<String> argList = args
-        println "Helo.  $argList.size args: $args" */
+        // Can't think of any execution option options, for now...
         new Service().serve()
     }
 
@@ -32,11 +32,11 @@ class Service extends HashMap implements Runnable {
         reader = new BufferedReader(new InputStreamReader(System.in, 'UTF-8'))
         writer = new OutputStreamWriter(System.out)
         new Thread(this).start()
-        System.err.println 'started'
+        logger.info 'started'
     }
 
     void run() {
-        System.err.println 'serve start'
+        logger.info 'serve start'
         final char[] buffer = new char[CHAR_BUFFER_SIZE]
         int i
         def obj
@@ -46,7 +46,7 @@ class Service extends HashMap implements Runnable {
             try {
                 obj = slurper.parseText(String.valueOf(buffer, 0, i))
             } catch(JsonException je) {
-                System.err.println "Input not JSON: $je.message"
+                logger.log Level.SEVERE, "Input not JSON: $je.message"
                 continue
             }
             if (obj !instanceof Map)
@@ -55,7 +55,7 @@ class Service extends HashMap implements Runnable {
             if (!('op' in obj.keySet()))
                 throw new RuntimeException(
                     'Input JSON contains no .op (Operation) value')
-            //println GroovyUtil.pretty(obj)
+            //logger.fine GroovyUtil.pretty(obj)
             switch (obj.op) {
               case 'instantiate':
                 requiredKeys = ['op', 'key', 'class', 'params'] as Set
@@ -95,7 +95,7 @@ class Service extends HashMap implements Runnable {
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
                 obj.params.add 0, obj['class']
-                System.err.println 'Need to find element type here'
+                logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
                     (it instanceof List) ? (it as Object[]) : it
                 }
@@ -119,7 +119,7 @@ class Service extends HashMap implements Runnable {
                     throw new RuntimeException(
                       "Input JSON contains non-string newKey: $obj.newKey")
                 obj.params.add 0, obj['class']
-                System.err.println 'Need to find element type here'
+                logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
                     (it instanceof List) ? (it as Object[]) : it
                 }
@@ -143,7 +143,7 @@ class Service extends HashMap implements Runnable {
                     throw new RuntimeException(
                       "Input JSON contains non-string newKey: $obj.newKey")
                 obj.params.add 0, obj.key
-                System.err.println 'Need to find element type here'
+                logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
                     (it instanceof List) ? (it as Object[]) : it
                 }
@@ -164,7 +164,7 @@ class Service extends HashMap implements Runnable {
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
                 obj.params.add 0, obj.key
-                System.err.println 'Need to find element type here'
+                logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
                     (it instanceof List) ? (it as Object[]) : it
                 }
@@ -230,10 +230,10 @@ class Service extends HashMap implements Runnable {
                 throw new RuntimeException("Unexpected operation: $obj.op")
             }
             writer.flush()
-            System.err.println 'server flushed'
+            logger.info 'server flushed'
         }
         writer.close()
-        System.err.println 'serve end'
+        logger.info 'serve end'
     }
 
     /**
@@ -275,7 +275,7 @@ class Service extends HashMap implements Runnable {
 
     private List<Object> dereference(final List<Object> inParams) {
         // Only going 1 level deep for now
-        System.err.println 'Do a true recursive dereferencing'
+        logger.warning 'Do a true recursive dereferencing'
         Object inst
         inParams.collect() {
             if (it instanceof Map) return it.collectEntries() {
@@ -328,7 +328,7 @@ class Service extends HashMap implements Runnable {
     private def _call(final Class cl, final Object inst,
     final String methodName, final List<Object> inParams) {
         final List<Object> params = dereference inParams
-        System.err.println "Got class $cl.name"
+        logger.log Level.FINE, "Got class $cl.name"
         List<Class> pTypes = params.collect() { it.getClass() }
         Method meth
         try {
@@ -337,8 +337,8 @@ class Service extends HashMap implements Runnable {
              //Purposefully empty
         }
         if (meth == null) {
-System.err.println 'Copy the fallback signature type checks to here'
-            System.err.println 'Trying fallback meth signatures'
+            logger.warning 'Copy the fallback signature type checks to here'
+            logger.info 'Trying fallback meth signatures'
             boolean anyChanged
             pTypes = pTypes.collect() {
                 Field f
@@ -353,7 +353,7 @@ System.err.println 'Copy the fallback signature type checks to here'
                 it.TYPE
             }
             if (!anyChanged) {
-                System.err.println 'Trying Obj[]->Str[]'
+                logger.info 'Trying Obj[]->Str[]'
                 pTypes = pTypes.collect() {
                     if (it != Object[].class) return it
                     anyChanged = true
@@ -366,7 +366,7 @@ System.err.println 'Copy the fallback signature type checks to here'
             try {
                 meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
             } catch (NoSuchMethodException) {
-                System.err.println(
+                logger.log(Level.WARNING,
                   "Trying last ditch effort since failing to find ${cl.name}.$methodName: $pTypes")
                 final matchingMethods = cl.getDeclaredMethods().findAll() {
                     it.name == methodName && it.parameterCount == params.size()
@@ -375,13 +375,13 @@ System.err.println 'Copy the fallback signature type checks to here'
                     throw new NoSuchMethodException(matchingMethods.size()
                       + " matches for meth signature ${cl.name}.$methodName: $pTypes")
                 meth = matchingMethods[0]
-System.err.println 'Empoloying severe hack'
+                logger.warning 'Employing severe hack'
 // When get IllegalArgument Exception with text "argument type mismatch",
 // need to auto cast array and lists to the declaration array/list types.
 params[3] = (String[]) params[3]
             }
         }
-        System.err.println "Got method ${cl.name}.$meth.name"
+        logger.log Level.FINE, "Got method ${cl.name}.$meth.name"
         if (inst == null && !Modifier.isStatic(meth.modifiers))
             throw new IllegalArgumentException(
               "Method is not static: meth.name")
@@ -414,7 +414,7 @@ params[3] = (String[]) params[3]
              //Purposefully empty
         }
         if (cons == null) {
-            System.err.println 'Trying primitivized cons signatures'
+            logger.fine 'Trying primitivized cons signatures'
             anyChanged = false
             pTypes = origPTypes.collect() {
                 Field f
@@ -435,7 +435,7 @@ params[3] = (String[]) params[3]
             }
         }
         if (cons == null) {
-            System.err.println 'Trying larger type cons signatures'
+            logger.fine 'Trying larger type cons signatures'
             anyChanged = false
             pTypes = origPTypes.collect() {
                 if (it == Integer.class) {
@@ -455,7 +455,7 @@ params[3] = (String[]) params[3]
             }
         }
         if (cons == null) {
-            System.err.println 'Trying primitivized larger type cons signatures'
+            logger.fine 'Trying primitivized larger type cons signatures'
             anyChanged = false
             pTypes = pTypes.collect() {
                 Field f

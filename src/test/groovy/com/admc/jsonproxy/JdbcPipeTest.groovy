@@ -53,7 +53,6 @@ class JdbcPipeTest extends Specification {
         writer.close()
         System.setOut origSystemOut
         System.setIn origSystemIn
-        println 'stdin/stdout restored'
         writer = null
         reader = null
         service = null

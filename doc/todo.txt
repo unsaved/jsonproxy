@@ -1,5 +1,3 @@
-Implement JDK logging.  Must log to stderr or log files (i.e. not stdout)
-
 Implement functions dedicated to cons/method-matching, and then
   forgiving cons/method-execution.
   Former does a cl.getDeclared*s findAll
