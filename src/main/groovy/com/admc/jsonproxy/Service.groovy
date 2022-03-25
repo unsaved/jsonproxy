@@ -199,7 +199,6 @@ class Service extends HashMap implements Runnable {
                 if (obj['class'] !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string class: ${obj['class']}")
-System.err.println('Will write: ' + JsonOutput.toJson(get(obj.key, obj['class'])));
                 writer.write JsonOutput.toJson(get(obj.key, obj['class']))
                 break
               case 'remove':
