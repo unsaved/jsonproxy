@@ -1,18 +1,9 @@
-Implement an error response protocol
-
-Decide whether to use a Java library 
-Re-learn JAVA JSON encoding and decoding
-
-Get Java compilation working in project
-
-Learn generally what happens to native arrays and primitive types given
-as params to Groovy functions, and when they are passed out as Java
-function calls.
-
-Depending findings above, and Fred's suggestions if any,
-translate some or all of Service class into Java.
-Java JSON libraries awful for list and map transformations!
-
 Implement JDK logging.  Must log to stderr or log files (i.e. not stdout)
 
-Make a unit test just like IOPipeTest that does JDBC operations
+Implement functions dedicated to cons/method-matching, and then
+  forgiving cons/method-execution.
+  Former does a cl.getDeclared*s findAll
+  Fred informs that invocations are forgiving w.r.t. different Number
+  subclasses.
+
+Implement an error response protocol
