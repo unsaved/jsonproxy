@@ -29,8 +29,6 @@ class Service extends HashMap implements Runnable {
      * executes
      */
     void serve() {
-        reader = new BufferedReader(new InputStreamReader(System.in, 'UTF-8'))
-        writer = new OutputStreamWriter(System.out)
         new Thread(this).start()
         logger.info 'started'
     }
@@ -40,9 +38,13 @@ class Service extends HashMap implements Runnable {
         final char[] buffer = new char[CHAR_BUFFER_SIZE]
         int i
         def obj
+        Object issueReport
         Set inputKeys, requiredKeys
         List deNestedListParams
-        while ((i = reader.read(buffer, 0, buffer.length)) > 0) {
+        reader = new BufferedReader(new InputStreamReader(System.in, 'UTF-8'))
+        writer = new OutputStreamWriter(System.out)
+        try { // just to close the writer
+        while ((i = reader.read(buffer, 0, buffer.length)) > 0) try {
             try {
                 obj = slurper.parseText(String.valueOf(buffer, 0, i))
             } catch(JsonException je) {
@@ -58,31 +60,31 @@ class Service extends HashMap implements Runnable {
             //logger.fine GroovyUtil.pretty(obj)
             switch (obj.op) {
               case 'instantiate':
-                requiredKeys = ['op', 'key', 'class', 'params'] as Set
+                requiredKeys = ['op', 'newKey', 'class', 'params'] as Set
                 inputKeys = obj.keySet()
                 if (requiredKeys != inputKeys)
                     throw new RuntimeException(
                       "Input '$obj.op' JSON has keys $inputKeys "
                       + "instead of $requiredKeys")
-                if (obj.key !instanceof String)
+                if (obj.newKey !instanceof String)
                     throw new RuntimeException(
-                      "Input JSON contains non-string key: $obj.key")
+                      "Input JSON contains non-string newKey: $obj.newKey")
                 if (obj['class'] !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string class: ${obj['class']}")
                 if (obj.params !instanceof List)
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
-                if (containsKey(obj.key))
+                if (containsKey(obj.newKey))
                     throw new RuntimeException('Repository already contains '
-                      + "an instance with key $obj.key")
+                      + "an instance with key $obj.newKey")
                 obj.params.add 0, obj['class']
-                obj.params.add 0, obj.key
+                obj.params.add 0, obj.newKey
                 instantiate(obj.params as Object[])
                 writer.write JsonOutput.toJson(null)
                 break
               case 'staticCall':
-                requiredKeys = ['op', 'class', 'params'] as Set
+                requiredKeys = ['op', 'class', 'params', 'methodName'] as Set
                 inputKeys = obj.keySet()
                 if (requiredKeys != inputKeys)
                     throw new RuntimeException(
@@ -91,19 +93,25 @@ class Service extends HashMap implements Runnable {
                 if (obj['class'] !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string class: ${obj['class']}")
+                if (obj.methodName !instanceof String)
+                    throw new RuntimeException(
+                      'Input JSON contains non-string methodName: '
+                      + obj.methodName)
                 if (obj.params !instanceof List)
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
+                obj.params.add 0, obj.methodName
                 obj.params.add 0, obj['class']
                 logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
-                    (it instanceof List) ? (it as Object[]) : it
+                    it instanceof List ? it as Object[] : it
                 }
                 writer.write JsonOutput.toJson(
                   staticCall(deNestedListParams as Object[]))
                 break
               case 'staticCallPut':
-                requiredKeys = ['op', 'class', 'params', 'newKey'] as Set
+                requiredKeys =
+                  ['op', 'class', 'params', 'newKey', 'methodName'] as Set
                 inputKeys = obj.keySet()
                 if (requiredKeys != inputKeys)
                     throw new RuntimeException(
@@ -112,22 +120,28 @@ class Service extends HashMap implements Runnable {
                 if (obj['class'] !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string class: ${obj['class']}")
+                if (obj.methodName !instanceof String)
+                    throw new RuntimeException(
+                      'Input JSON contains non-string methodName: '
+                      + obj.methodName)
                 if (obj.params !instanceof List)
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
                 if (obj.newKey !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string newKey: $obj.newKey")
+                obj.params.add 0, obj.methodName
                 obj.params.add 0, obj['class']
                 logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
-                    (it instanceof List) ? (it as Object[]) : it
+                    it instanceof List ? it as Object[] : it
                 }
                 put obj.newKey, staticCall(deNestedListParams as Object[])
                 writer.write JsonOutput.toJson(null)
                 break
               case 'callPut':
-                requiredKeys = ['op', 'key', 'params', 'newKey'] as Set
+                requiredKeys =
+                  ['op', 'key', 'params', 'newKey', 'methodName'] as Set
                 inputKeys = obj.keySet()
                 if (requiredKeys != inputKeys)
                     throw new RuntimeException(
@@ -136,22 +150,27 @@ class Service extends HashMap implements Runnable {
                 if (obj.key !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string key: $obj.key")
+                if (obj.methodName !instanceof String)
+                    throw new RuntimeException(
+                      'Input JSON contains non-string methodName: '
+                      + obj.methodName)
                 if (obj.params !instanceof List)
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
                 if (obj.newKey !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string newKey: $obj.newKey")
+                obj.params.add 0, obj.methodName
                 obj.params.add 0, obj.key
                 logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
-                    (it instanceof List) ? (it as Object[]) : it
+                    it instanceof List ? it as Object[] : it
                 }
                 put obj.newKey, call(deNestedListParams as Object[])
                 writer.write JsonOutput.toJson(null)
                 break
               case 'call':
-                requiredKeys = ['op', 'key', 'params'] as Set
+                requiredKeys = ['op', 'key', 'params', 'methodName'] as Set
                 inputKeys = obj.keySet()
                 if (requiredKeys != inputKeys)
                     throw new RuntimeException(
@@ -160,13 +179,18 @@ class Service extends HashMap implements Runnable {
                 if (obj.key !instanceof String)
                     throw new RuntimeException(
                       "Input JSON contains non-string key: $obj.key")
+                if (obj.methodName !instanceof String)
+                    throw new RuntimeException(
+                      'Input JSON contains non-string methodName: '
+                      + obj.methodName)
                 if (obj.params !instanceof List)
                     throw new RuntimeException(
                       "Input JSON contains non-List params: $obj.params")
+                obj.params.add 0, obj.methodName
                 obj.params.add 0, obj.key
                 logger.warning 'Need to find element type here'
                 deNestedListParams = obj.params.collect() {
-                    (it instanceof List) ? (it as Object[]) : it
+                    it instanceof List ? it as Object[] : it
                 }
                 writer.write JsonOutput.toJson(
                   call(deNestedListParams as Object[]))
@@ -229,11 +253,30 @@ class Service extends HashMap implements Runnable {
               default:
                 throw new RuntimeException("Unexpected operation: $obj.op")
             }
+        } catch(RuntimeException re) {
+            logger.log Level.SEVERE, "Handling ${re.getClass().name}: $re.message"
+            issueReport = [
+              type: 'error',
+              summary: "Service threw a ${re.getClass().name}: $re.message",
+            ]
+            issueReport.detail = re.cause ?
+              ("Service threw a ${re.getClass().name}: $re.message\n"
+               + (re.cause.stackTrace.collect() { it.toString() }).join('\n')) :
+              (re.stackTrace.collect() { it.toString() }).join('\n')
+            writer.write JsonOutput.toJson(issueReport)
+        } catch(Throwable t) {
+            logger.log Level.SEVERE,
+              "Service aborting due to ${t.getClass().name}"
+            throw t
+        } finally {
             writer.flush()
-            logger.info 'server flushed'
+            logger.fine 'server flushed'
+        } // Close request-handler loop
+
+        } finally {  // close writer
+            writer.close()
+            logger.info 'serve end'
         }
-        writer.close()
-        logger.info 'serve end'
     }
 
     /**
@@ -245,10 +288,13 @@ class Service extends HashMap implements Runnable {
      * @returns method return value.  Null for void methods.
      */
     private def staticCall(final Object... args) {
-        final List params = args
-        if (params.size() < 2)
-            throw new IllegalArgumentException('Service.staticCall '
-              + 'requires at least 2 string param, className, methodName')
+        final List<Object> params = args
+        if (params.size() < 1 || params[0] !instanceof String)
+            throw new IllegalArgumentException(
+              "Service.staticCall param 'className' not a String: ${args[0]}")
+        if (params.size() < 2 || params[1] !instanceof String)
+            throw new IllegalArgumentException(
+              "Service.staticCall param 'methodName' not a String: ${args[1]}")
         _call(Class.forName(params.remove(0)), null, params.remove(0), params)
     }
 
@@ -262,9 +308,12 @@ class Service extends HashMap implements Runnable {
      */
     private def call(final Object... args) {
         final List params = args
-        if (params.size() < 2)
-            throw new IllegalArgumentException('Service.call '
-              + 'requires at least 2 string param, instanceKey, methodName')
+        if (params.size() < 1 || params[0] !instanceof String)
+            throw new IllegalArgumentException(
+              "Service.call param 'instanceKey' not a String: ${args[0]}")
+        if (params.size() < 2 || params[1] !instanceof String)
+            throw new IllegalArgumentException(
+              "Service.call 'methodName' not a String: ${args[1]}")
         String key = params.remove 0
         final Object inst = get key
         if (inst == null)
@@ -279,7 +328,7 @@ class Service extends HashMap implements Runnable {
         Object inst
         inParams.collect() {
             if (it instanceof Map) return it.collectEntries() {
-                if ((it.value !instanceof String) || !it.value.startsWith('@'))
+                if (it.value !instanceof String || !it.value.startsWith('@'))
                     return [it.key, it.value]
                 inst = get it.value.substring(1)
                 if (inst == null)
@@ -288,7 +337,7 @@ class Service extends HashMap implements Runnable {
                 [it.key, inst]
             }
             if (it instanceof List) return it.collect() {
-                if ((it !instanceof String) || !it.startsWith('@')) return it
+                if (it !instanceof String || !it.startsWith('@')) return it
                 inst = get it.substring(1)
                 if (inst == null)
                     throw new RuntimeException(
@@ -297,7 +346,7 @@ class Service extends HashMap implements Runnable {
             }
             if (it.getClass().isArray()) {
                 for (int i in 0..it.length-1) {
-                    if ((it[i] !instanceof String)
+                    if (it[i] !instanceof String
                       || !it[i].startsWith('@')) continue
                     inst = get it[i].substring(1)
                     if (inst == null)
@@ -307,7 +356,7 @@ class Service extends HashMap implements Runnable {
                 }
                 return it
             }
-            if ((it !instanceof String) || !it.startsWith('@'))
+            if (it !instanceof String || !it.startsWith('@'))
                 return it
             inst = get it.substring(1)
             if (inst == null)
@@ -355,14 +404,16 @@ class Service extends HashMap implements Runnable {
             if (!anyChanged) {
                 logger.info 'Trying Obj[]->Str[]'
                 pTypes = pTypes.collect() {
-                    if (it != Object[].class) return it
+                    if (it != Object[].getClass()) return it
                     anyChanged = true
-                    String[].class
+                    String[].getClass()
                 }
             }
+            /*
             if (!anyChanged)
                 throw new NoSuchMethodException('Specified meth signature '
                   + "not found for ${cl.name}.$methodName: $pTypes")
+            */
             try {
                 meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
             } catch (NoSuchMethodException) {
@@ -391,16 +442,19 @@ params[3] = (String[]) params[3]
     /**
      * Instantiate an object
      *
-     * @param key  String identifier for the new object in the repository
+     * @param newKey  String identifier for the new object in the repository
      * @param className
      * @param constructorParams
      * @returns nothing
      */
     void instantiate(final Object... args) {
         final List<String> params = args
-        if (params.size() < 2)
-            throw new IllegalArgumentException('Service.instantiate '
-              + 'requires at least 2 string params, key + className')
+        if (params.size() < 1 || params[0] !instanceof String)
+            throw new IllegalArgumentException(
+              "Service.instantiate param 'newKey' not a String: ${args[0]}")
+        if (params.size() < 2 || params[1] !instanceof String)
+            throw new IllegalArgumentException(
+              "Service.instantiate param 'className' not a String: ${args[1]}")
         final String key = params.remove 0
         final String clName = params.remove 0
         final Class cl = Class.forName clName

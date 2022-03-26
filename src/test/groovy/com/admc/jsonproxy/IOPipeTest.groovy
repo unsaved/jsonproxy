@@ -12,7 +12,6 @@ class IOPipe extends Specification {
 
     PrintStream origSystemOut = System.out
     InputStream origSystemIn = System.in
-    ByteArrayOutputStream baos = new ByteArrayOutputStream()
     JsonSlurper slurper = new JsonSlurper()
     OutputStreamWriter writer
     InputStreamReader reader
@@ -24,8 +23,14 @@ class IOPipe extends Specification {
          * but writing end not closed; yet throws if writing end
          * is closed.
         def obj = slurper.parse reader */
-        slurper.parseText String.valueOf(
-          buffer, 0, reader.read(buffer))
+        int i = reader.read buffer
+        // N.b. reader.ready is useless and always returns false
+        if (i < 1)
+            throw new RuntimeException("Read $i bytes off of input pipe")
+        if (i == buffer.length)
+            throw new RuntimeException(
+              'Input too large.  Increase IOPipeTest.MAX_INPUT size.')
+        slurper.parseText String.valueOf(buffer, 0, i)
     }
 
     def setup() {
@@ -35,7 +40,7 @@ class IOPipe extends Specification {
         PipedOutputStream pOutputStream
 
         // Set up pipe service->test
-        pInputStream = new PipedInputStream()
+        pInputStream = new PipedInputStream(MAX_INPUT)
         pOutputStream = new PipedOutputStream(pInputStream)
         System.setOut new PrintStream(pOutputStream, true, 'UTF-8') //svc.output
         reader = new InputStreamReader(pInputStream, 'UTF-8')
@@ -69,7 +74,7 @@ class IOPipe extends Specification {
         when:
         writer.write JsonOutput.toJson([
             op: 'instantiate',
-            key: 'key1',
+            newKey: 'key1',
             'class': 'java.util.Date',
             params: [123456789]
         ])
@@ -100,7 +105,7 @@ class IOPipe extends Specification {
         when:
         writer.write JsonOutput.toJson([
             op: 'instantiate',
-            key: 'key1',
+            newKey: 'key1',
             'class': 'java.util.Date',
             params: [123456789]
         ]);
@@ -147,7 +152,8 @@ class IOPipe extends Specification {
         writer.write JsonOutput.toJson([
             op: 'staticCall',
             'class': 'java.lang.String',
-            params: ['format', '<%s> (%d)', ['werd', 345]]
+            methodName: 'format',
+            params: ['<%s> (%d)', ['werd', 345]]
         ]);
         writer.flush()
         def obj = readObj()
@@ -164,7 +170,8 @@ class IOPipe extends Specification {
         writer.write JsonOutput.toJson([
             op: 'staticCallPut',
             'class': 'java.lang.String',
-            params: ['format', '<%s> (%d)', ['werd', 345]],
+            methodName: 'format',
+            params: ['<%s> (%d)', ['werd', 345]],
             newKey: 'output'
         ]);
         writer.flush()
@@ -193,7 +200,7 @@ class IOPipe extends Specification {
         when:
         writer.write JsonOutput.toJson([
             op: 'instantiate',
-            key: 'date',
+            newKey: 'date',
             'class': 'java.util.Date',
             params: [1000000000000]
         ])
@@ -209,7 +216,8 @@ class IOPipe extends Specification {
         writer.write JsonOutput.toJson([
             op: 'staticCall',
             'class': 'java.lang.String',
-            params: ['format', 'Today is %tB %<te', ['@date']]
+            methodName: 'format',
+            params: ['Today is %tB %<te', ['@date']]
         ]);
         writer.flush()
         obj = readObj()
@@ -237,7 +245,7 @@ class IOPipe extends Specification {
         then:
         writer.write JsonOutput.toJson([
             op: 'instantiate',
-            key: 'key1',
+            newKey: 'key1',
             'class': 'java.lang.String',
             params: ['input str']
         ])
@@ -255,7 +263,8 @@ class IOPipe extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'key1',
-            params: ['substring', 3, 7],
+            methodName: 'substring',
+            params: [3, 7],
         ]);
         writer.flush()
         obj = readObj()
@@ -282,7 +291,7 @@ class IOPipe extends Specification {
         when:
         writer.write JsonOutput.toJson([
             op: 'instantiate',
-            key: 'key1',
+            newKey: 'key1',
             'class': 'java.lang.String',
             params: ['input str']
         ])
@@ -299,7 +308,8 @@ class IOPipe extends Specification {
             op: 'callPut',
             key: 'key1',
             newKey: 'out',
-            params: ['substring', 3, 7],
+            methodName: 'substring',
+            params: [3, 7],
         ]);
         writer.flush()
         obj = readObj()
@@ -318,5 +328,16 @@ class IOPipe extends Specification {
 
         then:
         obj == true
+    }
+
+    def "no-such-op"() {
+        when:
+        writer.write JsonOutput.toJson([ op: 'no-such', ]);
+        writer.flush()
+        def obj = readObj()
+
+        then:
+        obj instanceof Map
+        obj.type == 'error'
     }
 }

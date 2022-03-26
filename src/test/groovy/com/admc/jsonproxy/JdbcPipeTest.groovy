@@ -12,7 +12,6 @@ class JdbcPipeTest extends Specification {
 
     PrintStream origSystemOut = System.out
     InputStream origSystemIn = System.in
-    ByteArrayOutputStream baos = new ByteArrayOutputStream()
     JsonSlurper slurper = new JsonSlurper()
     OutputStreamWriter writer
     InputStreamReader reader
@@ -24,8 +23,14 @@ class JdbcPipeTest extends Specification {
          * but writing end not closed; yet throws if writing end
          * is closed.
         def obj = slurper.parse reader */
-        slurper.parseText String.valueOf(
-          buffer, 0, reader.read(buffer))
+        int i = reader.read buffer
+        // N.b. reader.ready is useless and always returns false
+        if (i < 1)
+            throw new RuntimeException("Read $i bytes off of input pipe")
+        if (i == buffer.length)
+            throw new RuntimeException(
+              'Input too large.  Increase IOPipeTest.MAX_INPUT size.')
+        slurper.parseText String.valueOf(buffer, 0, i)
     }
 
     def setup() {
@@ -35,7 +40,7 @@ class JdbcPipeTest extends Specification {
         PipedOutputStream pOutputStream
 
         // Set up pipe service->test
-        pInputStream = new PipedInputStream()
+        pInputStream = new PipedInputStream(MAX_INPUT)
         pOutputStream = new PipedOutputStream(pInputStream)
         System.setOut new PrintStream(pOutputStream, true, 'UTF-8') //svc.output
         reader = new InputStreamReader(pInputStream, 'UTF-8')
@@ -66,7 +71,8 @@ class JdbcPipeTest extends Specification {
             op: 'staticCallPut',
             newKey: 'conn',
             'class': 'java.sql.DriverManager',
-            params: ['getConnection', 'jdbc:hsqldb:mem:name', 'SA', '']
+            methodName: 'getConnection',
+            params: ['jdbc:hsqldb:mem:name', 'SA', '']
         ]);
         writer.flush()
         obj = readObj()
@@ -79,7 +85,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'conn',
-            params: ['close'],
+            methodName: 'close',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -96,7 +103,8 @@ class JdbcPipeTest extends Specification {
             op: 'staticCallPut',
             newKey: 'conn',
             'class': 'java.sql.DriverManager',
-            params: ['getConnection', 'jdbc:hsqldb:mem:name', 'SA', '']
+            methodName: 'getConnection',
+            params: ['jdbc:hsqldb:mem:name', 'SA', '']
         ]);
         writer.flush()
         obj = readObj()
@@ -110,7 +118,8 @@ class JdbcPipeTest extends Specification {
             op: 'callPut',
             key: 'conn',
             newKey: 'statement',
-            params: ['createStatement'],
+            methodName: 'createStatement',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -122,7 +131,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'statement',
-            params: ['execute', 'CREATE TABLE tbl(i INT, s VARCHAR(20))'],
+            methodName: 'execute',
+            params: ['CREATE TABLE tbl(i INT, s VARCHAR(20))'],
         ]);
         writer.flush()
         obj = readObj()
@@ -135,7 +145,8 @@ class JdbcPipeTest extends Specification {
             op: 'callPut',
             key: 'conn',
             newKey: 'metadata',
-            params: ['getMetaData'],
+            methodName: 'getMetaData',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -148,7 +159,8 @@ class JdbcPipeTest extends Specification {
             op: 'callPut',
             key: 'metadata',
             newKey: 'rs',
-            params: ['getTables', null, 'PUBLIC', null, ['TABLE']],
+            methodName: 'getTables',
+            params: [null, 'PUBLIC', null, ['TABLE']],
         ]);
         writer.flush()
         obj = readObj()
@@ -160,7 +172,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'rs',
-            params: ['next'],
+            methodName: 'next',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -172,7 +185,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'rs',
-            params: ['getString', 'TABLE_NAME'],
+            methodName: 'getString',
+            params: ['TABLE_NAME'],
         ]);
         writer.flush()
         obj = readObj()
@@ -184,7 +198,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'conn',
-            params: ['close'],
+            methodName: 'close',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -201,7 +216,8 @@ class JdbcPipeTest extends Specification {
             op: 'staticCallPut',
             newKey: 'conn',
             'class': 'java.sql.DriverManager',
-            params: ['getConnection', 'jdbc:hsqldb:mem:name', 'SA', '']
+            methodName: 'getConnection',
+            params: ['jdbc:hsqldb:mem:name', 'SA', '']
         ]);
         writer.flush()
         obj = readObj()
@@ -215,7 +231,8 @@ class JdbcPipeTest extends Specification {
             op: 'callPut',
             key: 'conn',
             newKey: 'statement',
-            params: ['createStatement'],
+            methodName: 'createStatement',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -227,7 +244,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'statement',
-            params: ['execute', "INSERT INTO tbl VALUES(1, 'one')"],
+            methodName: 'execute',
+            params: ["INSERT INTO tbl VALUES(1, 'one')"],
         ]);
         writer.flush()
         obj = readObj()
@@ -240,7 +258,8 @@ class JdbcPipeTest extends Specification {
             op: 'callPut',
             key: 'statement',
             newKey: 'rs',
-            params: ['executeQuery', 'SELECT * FROM tbl'],
+            methodName: 'executeQuery',
+            params: ['SELECT * FROM tbl'],
         ]);
         writer.flush()
         obj = readObj()
@@ -252,7 +271,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'rs',
-            params: ['next'],
+            methodName: 'next',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
@@ -264,7 +284,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'rs',
-            params: ['getString', 'S'],
+            methodName: 'getString',
+            params: ['S'],
         ]);
         writer.flush()
         obj = readObj()
@@ -276,7 +297,8 @@ class JdbcPipeTest extends Specification {
         writer.write JsonOutput.toJson([
             op: 'call',
             key: 'conn',
-            params: ['close'],
+            methodName: 'close',
+            params: [],
         ]);
         writer.flush()
         obj = readObj()
