@@ -1,9 +1,5 @@
-Add dedicated param methodName to the call* commands
-
 Implement functions dedicated to cons/method-matching, and then
   forgiving cons/method-execution.
   Former does a cl.getDeclared*s findAll
   Fred informs that invocations are forgiving w.r.t. different Number
   subclasses.
-
-Implement an error response protocol
