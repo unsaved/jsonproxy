@@ -9,8 +9,8 @@ class MethodCaller {
     private Class cl
     private Object inst
     private String methodName
-    private paramVals
-    def candidates
+    private List<Object> paramVals
+    private def candidates
 
     private MethodCaller(final Class cl, final Object inst,
     final String methodName, final List<Object> params) {
@@ -37,16 +37,25 @@ class MethodCaller {
     }
 
     static def call(final Class cl, final List<Object> params) {
+        logger.log Level.INFO, "Constructor call for {0}-param {1}", params.size(), cl.simpleName
         new MethodCaller(cl, null, null, params)
+        def cs = new MethodCaller(cl, null, null, params).candidates
+        if (cs.size() != 1) throw new Error("Resolved to ${cs.size()}  constructors")
+        // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
+        // method() call method below.
+        cs.keySet()[0].newInstance(params as Object[])
     }
 
     static def call(final Object inst,
     final String methodName, final List<Object> params) {
+        logger.log Level.INFO, "Instance call for {0}-param {1}.{2}",
+          params.size(), inst.getClass().simpleName, methodName
         def cs = new MethodCaller(inst.getClass(), int, methodName, params).candidates
         if (cs.size() != 1) throw new Error("Resolved to ${cs.size()}  methods")
         // Major Groovy defect here, even in 4.0.0.
         // The entire JRE load starts over (with same pid) if invoke done with params
-        // has nothign to do with resolving inst or params here.
+        // has nothing to do with resolving inst or params here.
+logger.log Level.WARNING, "Invoking {0}.{1} of {2}", cs[0].declaringClass.simpleName, methodName, inst.getClass().simpleName
         cs.keySet()[0].invoke(inst, params as Object[])
     }
 }
