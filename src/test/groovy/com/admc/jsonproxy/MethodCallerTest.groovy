@@ -1,8 +1,7 @@
 package com.admc.jsonproxy
 
 import spock.lang.Specification
-import java.sql.Connection
-import java.sql.DriverManager
+import java.util.regex.Pattern
 
 class MethodCallerTest extends Specification {
     private Service service
@@ -15,11 +14,44 @@ class MethodCallerTest extends Specification {
         obj instanceof ArrayList
     }
 
-    def "method/no-param"() {
+    def "instmeth/no-param"() {
         when:
         def res = MethodCaller.call([1, 'two', 'three'], 'size', [])
 
         then:
         res == 3
+    }
+
+    def "instmeth/1-Int"() {
+        when:
+        def res = MethodCaller.call([1, 'two', 'three'], 'get', [1])
+
+        then:
+        res == 'two'
+    }
+
+    def "statmeth/1-Str"() {
+        when:
+        def res = MethodCaller.call(Pattern.class, 'compile', [/a*b/])
+
+        then:
+        res.pattern() == Pattern.compile(/a*b/).pattern()
+    }
+
+    def "cons/1-Str"() {
+        when:
+        def throwable =
+          MethodCaller.call(Throwable.class, ['msg'])
+
+        then:
+        throwable == new Throwable('msg')
+    }
+
+    def "statmeth/no-param"() {
+        when:
+        def ls = MethodCaller.call(System.class, 'lineSeparator', [])
+
+        then:
+        ls == System.lineSeparator()
     }
 }

@@ -12,7 +12,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Field
 
-@groovy.util.logging.Log(value='logger')
+@groovy.util.logging.Log(value = 'logger')
 class Service extends HashMap implements Runnable {
     private BufferedReader reader
     private OutputStreamWriter writer
