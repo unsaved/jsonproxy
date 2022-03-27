@@ -7,7 +7,7 @@ import groovy.json.JsonOutput
 // Workaround for Groovy defect hitting MethodCaller
 @groovy.transform.Field static int ctr = 0
 if (ctr > 2) {
-    System.err.println 'Imploing Groovy JRE-reinit workaround'
+    System.err.println 'Imploying Groovy JRE-reinit workaround'
 } else {
     def c = DriverManager.getConnection('jdbc:hsqldb:mem:name', 'SA', '')
 
