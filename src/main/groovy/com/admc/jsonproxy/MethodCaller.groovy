@@ -19,6 +19,7 @@ class MethodCaller {
         this.cl = cl
         this.inst = inst
         this.methodName = methodName
+        final Map<Executable, Parameter[]> candidates
         paramVals = params.toArray()
         final int paramCount = paramVals.length
         List<Class> pTypes = params.collect() { it.getClass() }
@@ -27,15 +28,13 @@ class MethodCaller {
             throw new RuntimeException(
               "${initialCandidates.size()} total ${paramCount}-param $cl.simpleName"
               + ".${methodName == null ? '<CONST>' : methodName}'s")
-        final Map<Executable, Parameter[]> candidates = methodName == null ?
-          initialCandidates.collectEntries() {
-              it.parameterCount == paramCount ?
-                [(it): it.typeParameters] :  [:]
-          } :
-          initialCandidates.collectEntries() {
-              it.name == methodName && it.parameterCount == paramCount ?
-                [it, it.parameterTypes] :  [:]
-          }
+        candidates = initialCandidates.collectEntries() {
+            (methodName == null || it.name == methodName) && it.parameterCount == paramCount ?
+              [it, it.parameterTypes] :  [:]
+        }
+
+        // Cull out candidates based on pTypes
+
         if (candidates.size() !== 1) throw new RuntimeException(
           "${candidates.size()} matching $cl.simpleName"
           + ".${methodName == null ? '<CONST>' : methodName} executables:\n"
@@ -50,7 +49,7 @@ class MethodCaller {
      * Attempts .executable executions with variants of paramVals until one succees.
      * Throws if non succeeds.
      */
-    def exec() {
+    private def _exec() {
         executable instanceof Constructor ?
             executable.newInstance(paramVals) :
             executable.invoke(inst, paramVals)
@@ -59,36 +58,36 @@ class MethodCaller {
     /**
      * Constructor invocation
      */
-    static def call(final Class cl, final List<Object> params) {
-        logger.log Level.INFO, "Constructor call for {0}-param {1}", params.size(), cl.simpleName
+    static def exec(final Class cl, final List<Object> params) {
+        logger.log Level.INFO, "Constructor exec for {0}-param {1}", params.size(), cl.simpleName
         // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
-        // instance method() call method below.
-        new MethodCaller(cl, null, null, params).exec()
+        // instance method() exec method below.
+        new MethodCaller(cl, null, null, params)._exec()
     }
 
     /**
      * Instance method invocation
      */
-    static def call(final Object inst,
+    static def exec(final Object inst,
     final String methodName, final List<Object> params) {
-        logger.log Level.INFO, "Instance call for {0}-param {1}.{2}",
+        logger.log Level.INFO, "Instance exec for {0}-param {1}.{2}",
           params.size(), inst.getClass().simpleName, methodName
         // Major Groovy defect here, even in 4.0.0.
         // The entire JRE load starts over (with same pid) if invoke done with params
         // has nothing to do with resolving inst or params here.
         //logger.log Level.WARNING, "Invoking {0}.{1} of {2}",
           //cs.keySet()[0].declaringClass.simpleName, methodName, inst.getClass().simpleName
-        new MethodCaller(inst.getClass(), inst, methodName, params).exec()
+        new MethodCaller(inst.getClass(), inst, methodName, params)._exec()
     }
 
     /**
      * Static method invocation
      */
-    static def call(final Class cl, final String methodName, final List<Object> params) {
-        logger.log Level.INFO, "Static call for {0}-param {1}.{2}",
+    static def exec(final Class cl, final String methodName, final List<Object> params) {
+        logger.log Level.INFO, "Static exec for {0}-param {1}.{2}",
           params.size(), cl.simpleName, methodName
         // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
-        // instance method() call method below.
-        new MethodCaller(cl, null, methodName, params).exec()
+        // instance method() exec method below.
+        new MethodCaller(cl, null, methodName, params)._exec()
     }
 }

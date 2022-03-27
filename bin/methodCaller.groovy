@@ -15,8 +15,8 @@ if (ctr > 2) {
     c.createStatement().execute 'CREATE TABLE tbl(i INT, s VARCHAR(20))'
     c.createStatement().execute(/INSERT INTO tbl VALUES(1, 'one')/)
 
-    def s = com.admc.jsonproxy.MethodCaller.call(c, 'createStatement', [])
-    def rs = com.admc.jsonproxy.MethodCaller.call(s, 'executeQuery',
+    def s = com.admc.jsonproxy.MethodCaller.exec(c, 'createStatement', [])
+    def rs = com.admc.jsonproxy.MethodCaller.exec(s, 'executeQuery',
       ['SELECT * FROM tbl'])
     println 'graceful completion'
 }
