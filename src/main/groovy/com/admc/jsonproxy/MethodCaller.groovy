@@ -55,7 +55,8 @@ class MethodCaller {
         // Major Groovy defect here, even in 4.0.0.
         // The entire JRE load starts over (with same pid) if invoke done with params
         // has nothing to do with resolving inst or params here.
-logger.log Level.WARNING, "Invoking {0}.{1} of {2}", cs[0].declaringClass.simpleName, methodName, inst.getClass().simpleName
+        //logger.log Level.WARNING, "Invoking {0}.{1} of {2}",
+          //cs.keySet()[0].declaringClass.simpleName, methodName, inst.getClass().simpleName
         cs.keySet()[0].invoke(inst, params as Object[])
     }
 }
