@@ -53,7 +53,7 @@ class Service extends HashMap implements Runnable {
             }
             if (obj !instanceof Map)
                 throw new RuntimeException(
-                    "Input JSON reconstituted to a ${obj.getClass().name}")
+                    "Input JSON reconstituted to a ${obj.getClass().simpleName}")
             if (!('op' in obj.keySet()))
                 throw new RuntimeException(
                     'Input JSON contains no .op (Operation) value')
@@ -254,19 +254,19 @@ class Service extends HashMap implements Runnable {
                 throw new RuntimeException("Unexpected operation: $obj.op")
             }
         } catch(RuntimeException re) {
-            logger.log Level.SEVERE, "Handling ${re.getClass().name}: $re.message"
+            logger.log Level.SEVERE, "Handling ${re.getClass().simpleName}: $re.message"
             issueReport = [
               type: 'error',
-              summary: "Service threw a ${re.getClass().name}: $re.message",
+              summary: "Service threw a ${re.getClass().simpleName}: $re.message",
             ]
             issueReport.detail = re.cause ?
-              ("Service threw a ${re.getClass().name}: $re.message\n"
+              ("Service threw a ${re.getClass().simpleName}: $re.message\n"
                + (re.cause.stackTrace.collect() { it.toString() }).join('\n')) :
               (re.stackTrace.collect() { it.toString() }).join('\n')
             writer.write JsonOutput.toJson(issueReport)
         } catch(Throwable t) {
             logger.log Level.SEVERE,
-              "Service aborting due to ${t.getClass().name}"
+              "Service aborting due to ${t.getClass().simpleName}"
             throw t
         } finally {
             writer.flush()
@@ -377,7 +377,7 @@ class Service extends HashMap implements Runnable {
     private def _call(final Class cl, final Object inst,
     final String methodName, final List<Object> inParams) {
         final List<Object> params = dereference inParams
-        logger.log Level.FINE, "Got class $cl.name"
+        logger.log Level.FINE, "Got class $cl.simpleName"
         List<Class> pTypes = params.collect() { it.getClass() }
         Method meth
         try {
@@ -412,19 +412,19 @@ class Service extends HashMap implements Runnable {
             /*
             if (!anyChanged)
                 throw new NoSuchMethodException('Specified meth signature '
-                  + "not found for ${cl.name}.$methodName: $pTypes")
+                  + "not found for ${cl.simpleName}.$methodName: $pTypes")
             */
             try {
                 meth = cl.getDeclaredMethod(methodName, pTypes as Class[])
             } catch (NoSuchMethodException) {
                 logger.log(Level.WARNING,
-                  "Trying last ditch effort since failing to find ${cl.name}.$methodName: $pTypes")
+                  "Trying last ditch effort since failing to find ${cl.simpleName}.$methodName: $pTypes")
                 final matchingMethods = cl.getDeclaredMethods().findAll() {
                     it.name == methodName && it.parameterCount == params.size()
                 }
                 if (matchingMethods.size() != 1)
                     throw new NoSuchMethodException(matchingMethods.size()
-                      + " matches for meth signature ${cl.name}.$methodName: $pTypes")
+                      + " matches for meth signature ${cl.simpleName}.$methodName: $pTypes")
                 meth = matchingMethods[0]
                 logger.warning 'Employing severe hack'
 // When get IllegalArgument Exception with text "argument type mismatch",
@@ -432,7 +432,7 @@ class Service extends HashMap implements Runnable {
 params[3] = (String[]) params[3]
             }
         }
-        logger.log Level.FINE, "Got method ${cl.name}.$meth.name"
+        logger.log Level.FINE, "Got method ${cl.simpleName}.$meth.name"
         if (inst == null && !Modifier.isStatic(meth.modifiers))
             throw new IllegalArgumentException(
               "Method is not static: meth.name")

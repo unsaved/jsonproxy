@@ -15,6 +15,7 @@ class GroovyUtil {
           m.appendReplacement sb, m.group().substring(
             0, ((m.group().length()/2).toInteger()))
         m.appendTail sb
-        return sb.toString()
+        return sb.toString().replaceAll('[{]\\s+[}]', '{}').
+          replaceAll('\\[\\s+\\]', '[]')
     }
 }
