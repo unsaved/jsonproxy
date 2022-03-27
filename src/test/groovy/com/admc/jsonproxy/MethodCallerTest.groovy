@@ -8,7 +8,7 @@ class MethodCallerTest extends Specification {
 
     def "cons/no-param"() {
         when:
-        Object obj = MethodCaller.call(ArrayList.class, [])
+        Object obj = MethodCaller.exec(ArrayList.class, [])
 
         then:
         obj instanceof ArrayList
@@ -16,7 +16,7 @@ class MethodCallerTest extends Specification {
 
     def "instmeth/no-param"() {
         when:
-        def res = MethodCaller.call([1, 'two', 'three'], 'size', [])
+        def res = MethodCaller.exec([1, 'two', 'three'], 'size', [])
 
         then:
         res == 3
@@ -24,7 +24,7 @@ class MethodCallerTest extends Specification {
 
     def "instmeth/1-Int"() {
         when:
-        def res = MethodCaller.call([1, 'two', 'three'], 'get', [1])
+        def res = MethodCaller.exec([1, 'two', 'three'], 'get', [1])
 
         then:
         res == 'two'
@@ -32,7 +32,7 @@ class MethodCallerTest extends Specification {
 
     def "statmeth/1-Str"() {
         when:
-        def res = MethodCaller.call(Pattern.class, 'compile', [/a*b/])
+        def res = MethodCaller.exec(Pattern.class, 'compile', [/a*b/])
 
         then:
         res.pattern() == Pattern.compile(/a*b/).pattern()
@@ -41,7 +41,7 @@ class MethodCallerTest extends Specification {
     def "cons/1-Str"() {
         when:
         def throwable =
-          MethodCaller.call(Throwable.class, ['msg'])
+          MethodCaller.exec(Throwable.class, ['msg'])
 
         then:
         throwable == new Throwable('msg')
@@ -49,7 +49,7 @@ class MethodCallerTest extends Specification {
 
     def "statmeth/no-param"() {
         when:
-        def ls = MethodCaller.call(System.class, 'lineSeparator', [])
+        def ls = MethodCaller.exec(System.class, 'lineSeparator', [])
 
         then:
         ls == System.lineSeparator()

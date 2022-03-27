@@ -32,17 +32,18 @@ class MethodCaller {
             (methodName == null || it.name == methodName) && it.parameterCount == paramCount ?
               [it, it.parameterTypes] :  [:]
         }
-
-        // Cull out candidates based on pTypes
-
-        if (candidates.size() !== 1) throw new RuntimeException(
-          "${candidates.size()} matching $cl.simpleName"
-          + ".${methodName == null ? '<CONST>' : methodName} executables:\n"
-          + GroovyUtil.pretty(candidates.collectEntries() { [it.key.name, it.value.simpleName]}))
         logger.log Level.WARNING, "{0} {1}.{2} Candidates: {3}",
           candidates.size(), cl.simpleName, methodName, GroovyUtil.pretty(
           candidates.collectEntries() { [it.key.name, it.value.simpleName]})
-        executable = candidates.keySet()[0]
+
+        // Cull out candidates based on pTypes
+        final Set<Executable> matches = candidates.keySet()
+
+        if (matches.size() !== 1) throw new RuntimeException(
+          "${matches.size()} match $cl.simpleName"
+          + ".${methodName == null ? '<CONST>' : methodName} executables:\n"
+          + GroovyUtil.pretty(candidates.collectEntries() { [it.key.name, it.value.simpleName]}))
+        executable = matches[0]
     }
 
     /**
