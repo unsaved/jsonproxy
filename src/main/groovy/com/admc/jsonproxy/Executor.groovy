@@ -16,14 +16,14 @@ import java.lang.reflect.Array
  * Can then easily determine if scalar with Class.name.indexOf('.')
  */
 @groovy.util.logging.Log(value = 'logger')
-class MethodCaller {
+class Executor {
     private Class cl
     private Object inst
     private String methodName
     private Object[] paramVals
     private Executable executable
 
-    private MethodCaller(final Class cl, final Object inst,
+    private Executor(final Class cl, final Object inst,
     final String methodName, final List<Object> params) {
         this.cl = cl
         this.inst = inst
@@ -260,6 +260,250 @@ class MethodCaller {
     }
 
     /**
+     * If the two classes differ and they are just different precision alternatives,
+     * and the first has higher precision than the last then true.
+     *
+     * As of today, I think that
+     *    Integer vs. Long
+     *    Float vs. Double
+     * are the ony cases to handle, so that's all we're supporting.
+     */
+    static boolean isHigherPrecision(Class c1, Class c2) {
+        if (c1 == c2) return null
+        if (c1 == Long.class && c2 == Integer.class) return true
+        if (c1 == Double.class && c2 == Float.class) return true
+        false
+    }
+
+    /**
+     * Returns summary of values at level 'level'.
+     *
+     * Object.class return means must allow any
+     *   (as soon as vals must allow 2 unrelated types, it must allow Objects
+     *    and therefore null, even with native arrays).
+     * Void.class return means no checking at all
+     * null.class return means no checking other than must allow null
+     *
+     * RETURNS:
+     *     condition                                          returns
+     *     -----------------------------------------------   -----------
+     *     Non-collection                                    scalar val (incl. null)
+     *     No values (empty list)                            Void.class
+     *     All values are nulls                              null.class
+     *     Any Object member                                 Object.class
+     *     Two non-null members have no common parent class  Object.class
+     *     Otherwise + Any non-null value is a scalar        {} w/no child/nest)
+     *     Otherwise.  All non-null members are collections  {} w/ child/nest
+     *
+     * Limitation:  Does not yet support maps
+     */
+    static private def valSummary(final Object levelMembers) {
+        final Class pClass = levelMembers.getClass()
+        if (pClass == null || !Collection.class.isAssignableFrom(pClass))
+            return levelMembers
+        if (levelMembers.size() < 1) return Void.class
+        def max, min
+        Class itClass, cc  // cc is abbreviation for Common Class
+        boolean anyNull, anyScalar
+        levelMembers.each() {
+            if (it == null) { anyNull = true; return }
+
+            // Update cc:
+            itClass = it.getClass()
+            if (Map.class.isInstance(it))
+                throw new RuntimeException('Sorry but we '
+                  + "don't support Maps yet (you provided a ${itClass.name}")
+            if (!Collection.class.isInstance(it)) {
+                anyScalar = true
+                if (it instanceof Long) {
+                    if (it > max) max = it
+                    if (min == null || it < min) min = it
+                }
+            }
+            if (itClass == cc) {} // nothing to do with cc
+            else if (itClass == Object.class) cc = Object.class
+            else if (cc == null || itClass.isAssignableFrom(cc)) cc = itClass
+            // if cc.isAssignableFrom(itClass), keep more general cc
+            else if (!cc.isInstance(it)) {
+                // Trickiest case.  2 different non-inter-assignable classes.
+                // Need to see if they are precision-alternates or if
+                // they have a common ancestor class.
+                if (isHigherPrecision(cc, itClass)) {}
+                else if (isHigherPrecision(itClass, cc)) cc = itClass
+                else while ((itClass = itClass.superclass) != null)
+                    // This will always qualify once, Object for totally unrelated:
+                    if (itClass.isAssignableFrom(cc)) { cc = itClass; break; }
+            }
+            assert cc != null
+        }
+        if (cc == null) return cc.getClass()
+        if (cc == Object.class) return cc
+        Map retStruct = [
+            commonClass: cc,
+            anyNull: anyNull,
+            max: max,
+            min: min,
+        ]
+        if (!anyScalar) {
+            final List glom = []
+            levelMembers.each() {
+                if (it != null) glom.addAll it
+            }
+            retStruct.child = valSummary glom
+        }
+        retStruct
+    }
+
+    static private boolean compatible(def vSum, def pSpecTree) {
+        logger.fine "vSum isa ${vSum.getClass().name}:\n  $vSum"
+        logger.fine "pSpecTree isa ${pSpecTree.getClass().name}:\n  $pSpecTree"
+        Class checkSpec
+        boolean specPrimitive
+        if (Map.class.isInstance(pSpecTree)) {  // pTree Collection
+            if (vSum == null) return true  // array or Collection param may be null
+            if (vSum == Void.class) return true  // unrestricted
+            if (vSum == null.getClass())
+                // Only conflict is if array of primitives
+                return pSpecTree.listType != null ||      // non-array
+                  pSpecTree.members !instanceof String || // nested coll/array
+                  pSpecTree.members.indexOf('.') > 0      // non-primitive scalar
+            if (vSum == Object.class) return pSpecTree.members == 'java.lang.Object'
+            if (Map.class.isInstance(vSum)) {
+                // incompatible if any null member for native array of primitives
+                if (vSum.anyNull && pSpecTree.listType == null
+                  && pSpecTree.members instanceof String
+                  && pSpecTree.members.indexOf('.') < 0) return false
+                if (pSpecTree.members instanceof String) {
+                    // vSum.commonClass / pS.members compatible?
+                    specPrimitive = pSpecTree.members.indexOf('.') < 0
+                    checkSpec = specPrimitive ?
+                      classForPrimitiveStr(pSpecTree.members) :
+                      Class.forName(pSpecTree.members)
+                    if (checkSpec.isAssignableFrom(vSum.commonClass)) return true
+                    // Check for special cases where a commonClass
+                    // precision-alternate could work.
+                    if (vSum.commonClass == Integer.class
+                      && checkSpec == Long.class) return true
+                    if (vSum.commonClass == Float.class
+                      && checkSpec == Double.class) return true
+                    if (vSum.commonClass == Long.class
+                      && checkSpec == Integer.class
+                      && vSum.max <= Integer.MAX_VALUE
+                      && vSum.min >= Integer.MIN_VALUE) return true
+                    // I believe for this can convert with:
+                    //  Float.valueOf(doubleVal.floatValue())
+                    if (vSum.commonClass == Double.class
+                      && checkSpec == Float.class) return true
+                    return false  // incompatible scalar members
+                }
+                // pS.members is a Map with .listType and .members
+                // I believe that vSum.commonClass and ps.listType here is
+                // only useful for conversion, since null is not an issue here.
+                return compatible(vSum.child, pSpecTree.members)
+            }
+            assert !Class.class.isInstance(vSum):
+              "Unexpected vSum ${vSum.getClass().name}: $vSum"
+            // vSum is a non-null scalar, but pSpecTree demands a coll/array
+            return false
+        } else {  // pTree scalar
+            specPrimitive = pSpecTree.indexOf('.') < 0
+            if (vSum == null)
+                // null value satisfies all scalar param other than primitive type
+                return !specPrimitive
+            checkSpec = specPrimitive ?
+              classForPrimitiveStr(pSpecTree) : Class.forName(pSpecTree)
+            if (checkSpec.isInstance(vSum)) return true
+            // Here we can now allow conversion to lower prevision because
+            // jsonSlurper would only have made the higher prevision if it
+            // would overflow the lower precision.
+            return isHigherPrecision(checkSpec, vSum.getClass())
+        }
+    }
+
+    private static def convertPVal(def val, def vSum, def pSpecTree) {
+        assert val == null || vSum != null
+        assert pSpecTree != null
+        logger.fine "Converting val isa ${val.getClass().name}:\n  $val"
+        logger.fine "vSum isa ${vSum.getClass().name}:\n  $vSum"
+        logger.fine "pSpecTree isa ${pSpecTree.getClass().name}:\n  $pSpecTree"
+        Class checkSpec
+        boolean specPrimitive
+        if (val == null) return val
+        if (Map.class.isInstance(pSpecTree)) {  // pTree Collection
+            // A happy (extreme) limitation of Groovy is that it ignores
+            // generic <qualifier>s and is able to call any Groovy or Java
+            // method of correct collection type with any gen. <qualifier>.
+            // So when pSpecTree.listType != null, just return the val.
+            if (vSum == Void.class)
+                // Return 0-length list of correct member-type
+                return pSpecTree.listType == null ?
+                  getArr0(pSpecTree.members) : val
+            if (vSum == null.getClass() || vSum == Object.class)
+                // Return typed list, but no need to convert any values
+                // (auto-boxing will take care of primitives).
+                return pSpecTree.listType == null ?
+                  toArray(val, pSpecTree.members) : val
+            if (Map.class.isInstance(vSum)) {
+                if (pSpecTree.members instanceof String) {
+                    specPrimitive = pSpecTree.members.indexOf('.') < 0
+                    checkSpec = specPrimitive ?
+                      classForPrimitiveStr(pSpecTree.members) :
+                      Class.forName(pSpecTree.members)
+                    // Convert all scalar members
+                    final Collection convertedScalars = val.collect() {
+                        // If null weren't allowed, the compatible function would
+                        // have returned false and prevented run of this function.
+                        if (it == null) return it
+                        if (checkSpec.isInstance(it)) return it
+                        // Check for special cases where a commonClass
+                        // precision-alternate could work.
+                        if (it instanceof Integer
+                          && checkSpec == Long.class) return (Long) it
+                        if (it instanceof Float
+                          && checkSpec == Double.class) return (Double) it
+                        if (it instanceof Long
+                          && checkSpec == Integer.class
+                          && it <= Integer.MAX_VALUE
+                          && it >= Integer.MIN_VALUE) return (Integer) it
+                        // I believe for this can convert with:
+                        //  Float.valueOf(doubleVal.floatValue())
+                        if (it instanceof Double && checkSpec == Float.class)
+                            return Float.valueOf(it.floatValue())
+                        assert false:
+                        "incompatible scalar member ($it) with checkSpec $checkSpec"
+                    }
+                    return pSpecTree.listType == null ?
+                      toArray(convertedScalars, pSpecTree.members) :
+                      convertedScalars
+                }
+                // pS.members is a Map with .listType and .members
+                // vSum.commonClass and ps.listType usefulhere
+                Collection cContainer = new ArrayList()
+                cContainer.addAll(val.collect() {
+                    convertPVal it, vSum.child, pSpecTree.members
+                })
+                return pSpecTree.listType == null ?
+                  toArray(cContainer, pSpecTree.members) : cContainer
+            }
+            assert false: "Got unexpected vSum of ${vSum.getClass().name}: $vSum"
+        } else {  // pTree scalar
+            assert val == vSum
+            specPrimitive = pSpecTree.indexOf('.') < 0
+            checkSpec = specPrimitive ?
+              classForPrimitiveStr(pSpecTree) : Class.forName(pSpecTree)
+            if (checkSpec.isInstance(val)) return val  // let auto-box
+            // Only remaining case is we need to increase precision
+            final Class vSumClass = val.getClass()
+            if (checkSpec == Double.class && vSumClass == Float.class)
+                return (Double) val
+            if (checkSpec == Long.class && vSumClass == Integer.class)
+                return (Long) val
+            assert false:
+              "Unexpected scalar type '${vSum.getClass().name}' for: $vSum"
+        }
+    }
+
+    /**
      * Attempts .executable executions with variants of paramVals until one succees.
      * Throws if non succeeds.
      */
@@ -276,7 +520,7 @@ class MethodCaller {
         logger.log Level.INFO, "Constructor exec for {0}-param {1}", params.size(), cl.simpleName
         // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
         // instance method() exec method below.
-        new MethodCaller(cl, null, null, params)._exec()
+        new Executor(cl, null, null, params)._exec()
     }
 
     /**
@@ -291,7 +535,7 @@ class MethodCaller {
         // has nothing to do with resolving inst or params here.
         //logger.log Level.WARNING, "Invoking {0}.{1} of {2}",
           //cs.keySet()[0].declaringClass.simpleName, methodName, inst.getClass().simpleName
-        new MethodCaller(inst.getClass(), inst, methodName, params)._exec()
+        new Executor(inst.getClass(), inst, methodName, params)._exec()
     }
 
     /**
@@ -302,6 +546,6 @@ class MethodCaller {
           params.size(), cl.simpleName, methodName
         // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
         // instance method() exec method below.
-        new MethodCaller(cl, null, methodName, params)._exec()
+        new Executor(cl, null, methodName, params)._exec()
     }
 }
