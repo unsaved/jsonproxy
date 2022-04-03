@@ -105,39 +105,87 @@ class Executor {
     static private def toArray(final Collection c, final String typeStr) {
         if (c == null) return null
         switch(typeStr) {
-          case 'int': return c.toArray(getArr0(typeStr)) as int[]
-          case 'long': return c.toArray(getArr0(typeStr)) as long[]
-          case 'float': return c.toArray(getArr0(typeStr)) as float[]
-          case 'double': return c.toArray(getArr0(typeStr)) as double[]
-          case 'char': return c.toArray(getArr0(typeStr)) as char[]
-          case 'byte': return c.toArray(getArr0(typeStr)) as byte[]
-          case 'boolean': return c.toArray(getArr0(typeStr)) as boolean[]
-          case 'short': return c.toArray(getArr0(typeStr)) as short[]
+          case 'int': return toPrimitiveArray(c, int[].class) as int[]
+          case 'long': return toPrimitiveArray(c, long[].class) as long[]
+          case 'float': return toPrimitiveArray(c, float[].class) as float[]
+          case 'double': return toPrimitiveArray(c, double[].class) as double[]
+          case 'char': return toPrimitiveArray(c, char[].class) as char[]
+          case 'byte': return toPrimitiveArray(c, byte[].class) as byte[]
+          case 'boolean': return toPrimitiveArray(c, boolean[].class) as boolean[]
+          case 'short': return toPrimitiveArray(c, short[].class) as short[]
           // Some internal Grooyv magic somehow allows only the following
           // toArray() to return a realy array without the 'as' directive:
           default: return c.toArray(getArr0(typeStr))
         }
     }
+    
+    /**
+     * From https://stackoverflow.com/questions/25149412/how-to-convert-listt-to-array-t-for-primitive-types-using-generic-method
+     *
+     * Not used now.  Consider using this in place of toArray above, when
+     * typeStr1 is a primitive type.
+     *
+     * Call like:  def ia = toPrimitiveArray [34, 325], int[].class
+     */
+    public static <P> P toPrimitiveArray(List<?> list, Class<P> arrayType) {
+        if (!arrayType.isArray())
+            throw new IllegalArgumentException(arrayType.toString());
+        Class<?> primitiveType = arrayType.getComponentType();
+        if (!primitiveType.isPrimitive())
+            throw new IllegalArgumentException(primitiveType.toString());
 
+        P array = arrayType.cast(Array.newInstance(primitiveType, list.size()));
+        for (int i = 0; i < list.size(); i++) Array.set(array, i, list.get(i));
+        return array;
+    }
+
+    /**
+     * Original goal was for this to handle arbitrarily deep nesting, but
+     * current implementation only works for 2 levels deep.
+     * Only clear way forward is to add more levels by explicitly coding
+     * type variants at higher levels like "new int[c.size()][][]",
+     * "new int[c.size()][][][]", etc.
+     * I know of no way to get this to work for arbitrary depth.
+     */
     static private def toArray(final Collection c, final Map typeMap) {
-        if (typeMap.listType == null) switch(typeMap.members) {
-          case 'int': return c.toArray(getArr0(typeMap.members))[] as int[][]
-          case 'long': return c.toArray(getArr0(typeMap.members))[] as long[][]
-          case 'float': return c.toArray(getArr0(typeMap.members))[] as float[][]
-          case 'double': return c.toArray(getArr0(typeMap.members))[] as double[][]
-          case 'char': return c.toArray(getArr0(typeMap.members))[] as char[][]
-          case 'byte': return c.toArray(getArr0(typeMap.members))[] as byte[][]
-          case 'boolean': return c.toArray(getArr0(typeMap.members))[] as boolean[][]
-          case 'short': return c.toArray(getArr0(typeMap.members))[] as short[][]
-          case 'java.lang.String':
-            //return c.toArray(new String[0][]) as String[][]
-            return c.toArray(getArr0(typeMap.members)[]) as String[][]
-          default:
-            throw new RuntimeException(
-              "You have hit the critical limition of this app.\nCan't get "
-              + 'groovy to generate a Class[][] for arbitrary object Class.\n'
-              + "As workaround can add a specific case for '$typeMap.members'.")
-          //default: return c.toArray(getArr0(typeMap.members))[]
+        if (typeMap.listType == null) {
+            def aa
+            Class arrayType
+            switch(typeMap.members) {
+              //case 'int': return c.toArray(getArr0(typeMap.members))[] as int[][]
+              case 'int':
+                arrayType = int[].class; aa = new int[c.size()][]; break
+              case 'long':
+                arrayType = long[].class; aa = new long[c.size()][]; break
+              case 'float':
+                arrayType = float[].class; aa = new float[c.size()][]; break
+              case 'double':
+                arrayType = double[].class; aa = new double[c.size()][]; break
+              case 'char':
+                arrayType = char[].class; aa = new char[c.size()][]; break
+              case 'byte':
+                arrayType = byte[].class; aa = new byte[c.size()][]; break
+              case 'boolean':
+                arrayType = boolean[].class; aa = new boolean[c.size()][]; break
+              case 'short':
+                arrayType = short[].class; aa = new short[c.size()][]; break
+              case 'java.lang.String':
+                //return c.toArray(new String[0][]) as String[][]
+                return c.toArray(getArr0(typeMap.members)[]) as String[][]
+              default:
+                throw new RuntimeException(
+                  "You have hit the critical limition of this app.\nCan't get "
+                  + 'groovy to generate a Class[][] for arbitrary object Class.\n'
+                  + "As workaround can add a specific case for '$typeMap.members'.")
+              //default: return c.toArray(getArr0(typeMap.members))[]
+            }
+            //c.each() { aa[i++] = toArray(it, 'int') }
+            int i
+            c.each() {
+                aa[i++] = it == null || it.getClass().isArray() ?
+                  it : it.toPrimitiveArray(it, arrayType)
+            }
+            return aa
         }
         switch (typeMap.listType) {
           case List.class: return c.toArray(typeMap.listType) as List[]

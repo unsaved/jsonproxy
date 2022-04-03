@@ -22,11 +22,16 @@ import java.util.logging.Level
  *   a array
  *   T list
  *
- * For now there are only samples for single-parameter methods, since that
- * allow us to most conveniently test everything that needs to be tested.
+ * We need to test primitive and non-primitive on the Method param side,
+ * but we don't need to test any primitive invocation-side param values,
+ * since our JsonSlurper will never provide a primitive param value.
  *
- * (There are commented out multi-param sample methods that can be enabled
- * and expanded if there turns out to be a need).
+ * For now there are only samples for single-parameter methods, static
+ * methods, and Methods (no Constructors) since this allows us to most
+ * conveniently test everything that needs to be tested.
+ *
+ * (A few multi-param method samples are commented out.  They can be
+ * enabled and expanded if there turns out to be a need).
  */
  @groovy.util.logging.Log(value = 'logger')
 class SampleMethods {
@@ -105,10 +110,10 @@ class SampleMethods {
 
     // wrappers
     static void I(Integer i) {
-        logger.fine(i == null ? '<NULL>' : i)
+        logger.fine(i == null ? '<NULL>' : i.toString())
     }
     static void L(Long l) {
-        logger.fine(l == null ? '<NULL>' : l)
+        logger.fine(l == null ? '<NULL>' : l.toString())
     }
 
     // primitives
@@ -116,8 +121,8 @@ class SampleMethods {
     // value instead of a primitive value, Groovy does enforce that it
     // can't be called with null, and therefore body will not get a
     // null primitive value
-    static void i(int i) { logger.fine i }
-    static void l(long l) { logger.fine l }
+    static void i(int i) { logger.fine i.toString() }
+    static void l(long l) { logger.fine l.toString() }
 
     static void o(Object o) { logger.fine "isa ${o.getClass().name}: $o" }
     static void S(String S) { logger.fine S }
