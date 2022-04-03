@@ -3,7 +3,7 @@ package com.admc.jsonproxy
 import spock.lang.Specification
 import java.util.regex.Pattern
 
-class ExecutorTest extends Specification {
+class ExecTest extends Specification {
     private Service service
 
     def "cons/no-param"() {
