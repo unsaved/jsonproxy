@@ -295,7 +295,7 @@ class Service extends HashMap implements Runnable {
         if (params.size() < 2 || params[1] !instanceof String)
             throw new IllegalArgumentException(
               "Service.staticCall param 'methodName' not a String: ${args[1]}")
-        _call(Class.forName(params.remove(0)), null, params.remove(0), params)
+        Executor.exec(Class.forName(params.remove(0)), params.remove(0), params)
     }
 
     /**
