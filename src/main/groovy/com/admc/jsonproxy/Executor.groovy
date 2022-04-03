@@ -4,6 +4,7 @@ import java.util.logging.Level
 import java.lang.reflect.Executable
 import java.lang.reflect.Parameter
 import java.lang.reflect.Constructor
+import java.lang.reflect.Type
 import com.admc.groovy.GroovyUtil
 import java.util.regex.Matcher
 import java.util.Map
@@ -24,42 +25,53 @@ class Executor {
     private Class cl
     private Object inst
     private String methodName
-    private Object[] paramVals
     private Executable executable
+    private List pSummaries
+    private List pSpecTrees
+    private List<Object> paramVals
 
     private Executor(final Class cl, final Object inst,
-    final String methodName, final List<Object> params) {
+    final String methodName, final List<Object> paramVals) {
         this.cl = cl
         this.inst = inst
         this.methodName = methodName
-        final Map<Executable, Parameter[]> candidates
-        paramVals = params.toArray()
-        final int paramCount = paramVals.length
-        List<Class> pTypes = params.collect() { it.getClass() }
-        def initialCandidates = methodName == null ?
-          cl.declaredConstructors : cl.declaredMethods
+        this.paramVals = paramVals
+        final int paramCount = paramVals.size()
+        final Executable[] initialCandidates = (methodName == null ?
+          cl.declaredConstructors : cl.declaredMethods).findAll() {
+            (methodName == null || it.name == methodName) &&
+              it.parameterCount == paramCount
+        }
         if (initialCandidates.size() < 1)
             throw new RuntimeException(
           "${initialCandidates.size()} total ${paramCount}-param $cl.simpleName"
-              + ".${methodName == null ? '<CONST>' : methodName}'s")
-        candidates = initialCandidates.collectEntries() {
-            (methodName == null || it.name == methodName)
-              && it.parameterCount == paramCount ?
-              [it, it.parameterTypes] :  [:]
-        }
-        logger.log Level.WARNING, "{0} {1}.{2} Candidates: {3}",
-          candidates.size(), cl.simpleName, methodName, GroovyUtil.pretty(
-          candidates.collectEntries() { [it.key.name, it.value.simpleName]})
+              + ".${methodName == null ? '<CONST>' : methodName}'s with "
+              + "$paramCount params")
+        pSummaries = paramVals.collect() { param -> valSummary param }
 
         // Cull out candidates based on pTypes
-        final Set<Executable> matches = candidates.keySet()
+        final Map<Executable, List> candidates
+        candidates = initialCandidates.collectEntries() { Executable ex ->
+            List pSTs = ex.genericParameterTypes.collect() { Type type ->
+                toTree type.toString()
+            }
+            int i
+            pSTs.find() { pSpecTree ->
+                !compatible(pSummaries[i++], pSpecTree)
+            } ? [:] : [ex, pSTs]
+        }
+        logger.log Level.WARNING, "{0} {1}.{2} Candidates: {3}",
+          candidates.size(), cl.simpleName, methodName,
+          candidates.collectEntries() { [it.key.name, it.value.toString()]}
 
-        if (matches.size() !== 1) throw new RuntimeException(
-          "${matches.size()} match $cl.simpleName"
+        if (candidates.size() !== 1) throw new RuntimeException(
+          "${candidates.size()} match $cl.simpleName"
           + ".${methodName == null ? '<CONST>' : methodName} executables:\n"
-          + GroovyUtil.pretty(candidates.collectEntries() {
-            [it.key.name, it.value.simpleName]}))
-        executable = matches[0]
+          + candidates.collectEntries() { [it.key.name, it.value.toString()]})
+        executable = candidates.keySet()[0]
+        pSpecTrees = candidates[executable]
+        assert paramVals.size() == pSummaries.size()
+        assert pSummaries.size() == pSpecTrees.size()
     }
 
     /**
@@ -134,7 +146,7 @@ class Executor {
         throw new RuntimeException(
           'You have hit the critical limition of this app.\n'
         + /Can't get groovy to generate a Class[][] for arbitrary list type."/
-          + "\nAs workaround can add a specific case for '$typeMap.listType'.");
+          + "\nAs workaround can add a specific case for '$typeMap.listType'.")
     }
 
     /**
@@ -522,15 +534,19 @@ class Executor {
      * Throws if non succeeds.
      */
     private def _exec() {
+        int i = -1
+        final Object[] convertedPVals = paramVals.collect() { pVal ->
+            convertPVal pVal, pSummaries[++i], pSpecTrees[i]
+        }
         executable instanceof Constructor ?
-            executable.newInstance(paramVals) :
-            executable.invoke(inst, paramVals)
+            executable.newInstance(convertedPVals) :
+            executable.invoke(inst, convertedPVals)
     }
 
     /**
      * Constructor invocation
      */
-    static def exec(final Class cl, final List<Object> params) {
+    static def exec(final Class cl, final List params) {
         logger.log Level.INFO, "Constructor exec for {0}-param {1}",
           params.size(), cl.simpleName
         // Don't yet know if have the same invoke-elicits-JVM-restart issue as
@@ -556,7 +572,8 @@ class Executor {
     /**
      * Static method invocation
      */
-    static def exec(final Class cl, final String methodName, final List<Object> params) {
+    static def exec(
+    final Class cl, final String methodName, final List<Object> params) {
         logger.log Level.INFO, "Static exec for {0}-param {1}.{2}",
           params.size(), cl.simpleName, methodName
         // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
