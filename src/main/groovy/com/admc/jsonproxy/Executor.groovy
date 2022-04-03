@@ -11,6 +11,10 @@ import java.util.Collection
 import java.lang.reflect.Array
 
 /**
+ * This class is responsible for executing java.lang.reflex.Executables.
+ * It has nothing to do with the Executors in the java.util.concurrent
+ * package.
+ *
  * Major simplification to be had.
  * Save scalar types always as a Class by leveraging Class.forName('[S...;')
  * Can then easily determine if scalar with Class.name.indexOf('.')
@@ -32,13 +36,15 @@ class Executor {
         paramVals = params.toArray()
         final int paramCount = paramVals.length
         List<Class> pTypes = params.collect() { it.getClass() }
-        def initialCandidates = methodName == null ? cl.declaredConstructors : cl.declaredMethods
+        def initialCandidates = methodName == null ?
+          cl.declaredConstructors : cl.declaredMethods
         if (initialCandidates.size() < 1)
             throw new RuntimeException(
-              "${initialCandidates.size()} total ${paramCount}-param $cl.simpleName"
+          "${initialCandidates.size()} total ${paramCount}-param $cl.simpleName"
               + ".${methodName == null ? '<CONST>' : methodName}'s")
         candidates = initialCandidates.collectEntries() {
-            (methodName == null || it.name == methodName) && it.parameterCount == paramCount ?
+            (methodName == null || it.name == methodName)
+              && it.parameterCount == paramCount ?
               [it, it.parameterTypes] :  [:]
         }
         logger.log Level.WARNING, "{0} {1}.{2} Candidates: {3}",
@@ -51,7 +57,8 @@ class Executor {
         if (matches.size() !== 1) throw new RuntimeException(
           "${matches.size()} match $cl.simpleName"
           + ".${methodName == null ? '<CONST>' : methodName} executables:\n"
-          + GroovyUtil.pretty(candidates.collectEntries() { [it.key.name, it.value.simpleName]}))
+          + GroovyUtil.pretty(candidates.collectEntries() {
+            [it.key.name, it.value.simpleName]}))
         executable = matches[0]
     }
 
@@ -115,9 +122,9 @@ class Executor {
             return c.toArray(getArr0(typeMap.members)[]) as String[][]
           default:
             throw new RuntimeException(
-              'You have hit the critical limition of this app.\n'
-           + /Can't get groovy to generate a Class[][] for arbitrary object Class."/
-              + "\nAs workaround can add a specific case for '$typeMap.members'.");
+              "You have hit the critical limition of this app.\nCan't get "
+              + 'groovy to generate a Class[][] for arbitrary object Class.\n'
+              + "As workaround can add a specific case for '$typeMap.members'.")
           //default: return c.toArray(getArr0(typeMap.members))[]
         }
         switch (typeMap.listType) {
@@ -186,10 +193,12 @@ class Executor {
                   "Failed to parse single-level array from: $gSpec")
                 if (m.group(1) == 'L') {
                     if (m.group(2) == null)
-                        throw new Error("[L spec with no class specifier: $gSpec")
+                        throw new Error(
+                          "[L spec with no class specifier: $gSpec")
                 } else {
                     if (m.group(2) != null)
-                        throw new Error("[non-S spec with class specifier: $gSpec")
+                        throw new Error(
+                          "[non-S spec with class specifier: $gSpec")
                 }
                 switch (m.group(1)) {
                   case 'L':
@@ -260,8 +269,9 @@ class Executor {
     }
 
     /**
-     * If the two classes differ and they are just different precision alternatives,
-     * and the first has higher precision than the last then true.
+     * If the two classes differ and they are just different precision
+     * alternatives, and the first has higher precision than the last
+     * then true.
      *
      * As of today, I think that
      *    Integer vs. Long
@@ -360,16 +370,16 @@ class Executor {
         Class checkSpec
         boolean specPrimitive
         if (Map.class.isInstance(pSpecTree)) {  // pTree Collection
-            if (vSum == null) return true  // array or Collection param may be null
+            if (vSum == null) return true  // array or Coll. param may be null
             if (vSum == Void.class) return true  // unrestricted
             if (vSum == null.getClass())
                 // Only conflict is if array of primitives
                 return pSpecTree.listType != null ||      // non-array
                   pSpecTree.members !instanceof String || // nested coll/array
-                  pSpecTree.members.indexOf('.') > 0      // non-primitive scalar
+                  pSpecTree.members.indexOf('.') > 0      // non-prim. scalar
             if (vSum == Object.class) return pSpecTree.members == 'java.lang.Object'
             if (Map.class.isInstance(vSum)) {
-                // incompatible if any null member for native array of primitives
+                // incompatible if any null member for native array of prim.
                 if (vSum.anyNull && pSpecTree.listType == null
                   && pSpecTree.members instanceof String
                   && pSpecTree.members.indexOf('.') < 0) return false
@@ -379,7 +389,8 @@ class Executor {
                     checkSpec = specPrimitive ?
                       classForPrimitiveStr(pSpecTree.members) :
                       Class.forName(pSpecTree.members)
-                    if (checkSpec.isAssignableFrom(vSum.commonClass)) return true
+                    if (checkSpec.isAssignableFrom(vSum.commonClass))
+                        return true
                     // Check for special cases where a commonClass
                     // precision-alternate could work.
                     if (vSum.commonClass == Integer.class
@@ -408,7 +419,8 @@ class Executor {
         } else {  // pTree scalar
             specPrimitive = pSpecTree.indexOf('.') < 0
             if (vSum == null)
-                // null value satisfies all scalar param other than primitive type
+                // null value satisfies all scalar param other than
+                // primitive type
                 return !specPrimitive
             checkSpec = specPrimitive ?
               classForPrimitiveStr(pSpecTree) : Class.forName(pSpecTree)
@@ -420,7 +432,7 @@ class Executor {
         }
     }
 
-    private static def convertPVal(def val, def vSum, def pSpecTree) {
+    static private def convertPVal(def val, def vSum, def pSpecTree) {
         assert val == null || vSum != null
         assert pSpecTree != null
         logger.fine "Converting val isa ${val.getClass().name}:\n  $val"
@@ -451,8 +463,9 @@ class Executor {
                       Class.forName(pSpecTree.members)
                     // Convert all scalar members
                     final Collection convertedScalars = val.collect() {
-                        // If null weren't allowed, the compatible function would
-                        // have returned false and prevented run of this function.
+                        // If null weren't allowed, the compatible function
+                        // would have returned false and prevented run of this
+                        // function.
                         if (it == null) return it
                         if (checkSpec.isInstance(it)) return it
                         // Check for special cases where a commonClass
@@ -504,7 +517,8 @@ class Executor {
     }
 
     /**
-     * Attempts .executable executions with variants of paramVals until one succees.
+     * Attempts .executable executions with variants of paramVals until one
+     * success.
      * Throws if non succeeds.
      */
     private def _exec() {
@@ -517,9 +531,10 @@ class Executor {
      * Constructor invocation
      */
     static def exec(final Class cl, final List<Object> params) {
-        logger.log Level.INFO, "Constructor exec for {0}-param {1}", params.size(), cl.simpleName
-        // Don't yet know if have the same invoke-elicits-JVM-restart issue as the
-        // instance method() exec method below.
+        logger.log Level.INFO, "Constructor exec for {0}-param {1}",
+          params.size(), cl.simpleName
+        // Don't yet know if have the same invoke-elicits-JVM-restart issue as
+        // the instance method() exec method below.
         new Executor(cl, null, null, params)._exec()
     }
 
@@ -531,8 +546,8 @@ class Executor {
         logger.log Level.INFO, "Instance exec for {0}-param {1}.{2}",
           params.size(), inst.getClass().simpleName, methodName
         // Major Groovy defect here, even in 4.0.0.
-        // The entire JRE load starts over (with same pid) if invoke done with params
-        // has nothing to do with resolving inst or params here.
+        // The entire JRE load starts over (with same pid) if invoke done
+        // with params has nothing to do with resolving inst or params here.
         //logger.log Level.WARNING, "Invoking {0}.{1} of {2}",
           //cs.keySet()[0].declaringClass.simpleName, methodName, inst.getClass().simpleName
         new Executor(inst.getClass(), inst, methodName, params)._exec()
