@@ -38,16 +38,15 @@ class ExecTest extends Specification {
         res.pattern() == Pattern.compile(/a*b/).pattern()
     }
 
-/* Disabling just to allow regression testing with no errors during code merge.
     def "cons/1-Str"() {
         when:
         def throwable =
-          Executor.exec(Throwable.class, ['msg'])
+          Executor.exec(Throwable.class, ['distinctive.msg'])
 
         then:
-        throwable == new Throwable('msg')
+        throwable instanceof Throwable
+        throwable.message == 'distinctive.msg'
     }
-*/
 
     def "statmeth/no-param"() {
         when:
