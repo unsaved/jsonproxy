@@ -1,0 +1,3 @@
+Though Groovy doesn't enforce generic types, fields and parameters do get
+correct generified descriptions via Executable.getGenericParameterTypes and 
+Field.getGenericType.

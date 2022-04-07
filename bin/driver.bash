@@ -8,9 +8,9 @@ GROOVY_SCRIPT="${0%.bash}.groovy"
     echo "Where did '$GROOVY_SCRIPT' go to?" 1>&2
     exit 2
 }
-[ -f build/libs/jsonproxy.jar ] || {
-    echo "Build 'jsonproxy.jar' before using this script" 1>&2
-    exit 2
-}
+#[ -f build/libs/jsonproxy.jar ] || {
+    #echo "Build 'jsonproxy.jar' before using this script" 1>&2
+    #exit 2
+#}
 
-groovy -cp src/main/groovy "$GROOVY_SCRIPT" "$@"
+groovy -cp src/main/groovy:build/classes/java/ "$GROOVY_SCRIPT" "$@"

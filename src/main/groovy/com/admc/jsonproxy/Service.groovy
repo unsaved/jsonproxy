@@ -103,11 +103,14 @@ class Service extends HashMap implements Runnable {
                 obj.params.add 0, obj.methodName
                 obj.params.add 0, obj['class']
                 logger.warning 'Need to find element type here'
+                /*
                 deNestedListParams = obj.params.collect() {
-                    it instanceof List ? it as Object[] : it
+                    it instanceof List ? it : it
                 }
                 writer.write JsonOutput.toJson(
-                  staticCall(deNestedListParams as Object[]))
+                  staticCall(deNestedListParams))
+                */
+                writer.write JsonOutput.toJson(staticCall(obj.params as Object[]))
                 break
               case 'staticCallPut':
                 requiredKeys =
@@ -295,6 +298,7 @@ class Service extends HashMap implements Runnable {
         if (params.size() < 2 || params[1] !instanceof String)
             throw new IllegalArgumentException(
               "Service.staticCall param 'methodName' not a String: ${args[1]}")
+        //_call(Class.forName(params.remove(0)), null, params.remove(0), params)
         Executor.exec(Class.forName(params.remove(0)), params.remove(0), params)
     }
 
@@ -319,7 +323,8 @@ class Service extends HashMap implements Runnable {
         if (inst == null)
             throw new IllegalArgumentException(
               "We have no instance with key '$key'")
-        _call(inst.getClass(), inst, params.remove(0), params)
+        //_call(inst.getClass(), inst, params.remove(0), params)
+        Executor.exec(inst, params.remove(0), params)
     }
 
     private List<Object> dereference(final List<Object> inParams) {
@@ -458,6 +463,7 @@ params[3] = (String[]) params[3]
         final String key = params.remove 0
         final String clName = params.remove 0
         final Class cl = Class.forName clName
+        /*
         final List<Class> origPTypes = params.collect() { it.getClass() }
         List<Class> pTypes
         Constructor cons
@@ -529,6 +535,8 @@ params[3] = (String[]) params[3]
             cons = cl.getDeclaredConstructor(pTypes as Class[])
         }
         put(key, cons.newInstance(params as Object[]))
+        */
+        put(key, Executor.exec(cl, params))
     }
 
     /**

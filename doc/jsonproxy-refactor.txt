@@ -1,0 +1,69 @@
+Phase 1:
+    Convert GenericParameters into ParamReqs:
+        Class clazz
+        ParamReqs leafPR  recurse, null for non-coll
+        Integer arrayDimensions, null for non-array
+    Instantiate via one call with x.getGenericParameters().toString(),
+      recurse with substrings.
+Phase 2:
+    AnnotatedPV (collection summary).  Null if value is non-coll (incl. null)
+        anyNull
+        childAPV  (null if memberClass!=coll-class).  Constrains every data member.
+        size()
+        data
+        memberClass  Most general class matching all non-null members
+                     (often 'java.lang.Object')
+        isMap  (only String-key maps supported)
+    Instantiate only if top-level not a non-coll.  Recursively,
+         [data IS A collection]
+         pop all fields other than childAPV.
+         Only if memberClass!=Object:
+             Loop through all collection data members and recurse to
+             instantiate and get their AnnotatedPVs.
+             Coalesce member APVs to a single new childAPV.
+-----------------------------
+* 
+  { mc: List, sz:3, childAPV:
+    { mc: List, sz:6, childAPV: { mc: Int, childAPV: NL, sz:12 } } }
+  L1
+    { mc: java.util.List, sz:2, childAPV: { mc: Int, childAPV: NL, sz:4 } }
+    L11: 111, 112
+     { mc: Integer.class, sz: 2, childAPV: NL }
+    L12: 121, 122
+     { mc: Integer.class, sz: 2, childAPV: NL }
+  L2
+    { mc: java.util.List, childAPV: { mc: Integer.class, childAPV: null, sz:4 }}
+    L21: 211, 212
+    L22: 221: 222
+  L3 L31: null
+  L4 null
+  null
+-----------------------------
+Phase 3:
+    Starting at leafs, collate summarized metadata for all descendent collections.
+
+"Mixed level" means that a single level has some scalar and some sub-collection
+members.
+JSON supports this, and Java Object[] and Collection<Object> support this.
+(Primary eample being vararg Object[] of String.format).
+As soon as there is an 'Object' specifier, we can't do any more validation,
+because the method's requirements below this level can't be specified in
+parameter specifications.
+With no way to determine what the recipient desires, we must proceed with
+something, and it's easiest for me to procced with Collection.
+
+For each Executable param there is just one top-level type-specifier.
+This must be a series of LeafClass[] arrays and Collection<LeafClass>'s.
+    1  Leaf class is a regular dotted class name, or a single-cap prim. spec.
+    2  LeafClass[]...  never specify any type other than the leaf scalar class.
+       Each [] just specifies how many intermediate lists every leaf scalar
+       must have.
+    3 Collection<SubCol...<LeafClass>>...  specify only container Classes
+       and the single leaf scalar class, which last may not be a primitive
+       and which allways allows nulls.
+
+Difficulty.
+Though can easily dynamically get all array types like:
+  Class.forName("I]");
+  can not get direct primitive types with Class.forName("int").
+  Must apparently code a big switch and do like: int.class

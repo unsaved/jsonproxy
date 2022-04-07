@@ -10,4 +10,4 @@ GROOVY_SCRIPT="${0%.bash}.groovy"
 }
 
 # Somehow adding a -D switch to this command breaks the JDBC lookups???Ho
-groovy -cp /local/hsqldb/lib/hsqldb.jar:src/main/groovy "$GROOVY_SCRIPT" "$@"
+groovy -cp /local/hsqldb/lib/hsqldb.jar:src/main/groovy:build/classes/java/main "$GROOVY_SCRIPT" "$@"

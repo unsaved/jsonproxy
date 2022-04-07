@@ -47,6 +47,7 @@ class Executor {
           "${initialCandidates.size()} total ${paramCount}-param $cl.simpleName"
               + ".${methodName == null ? '<CONST>' : methodName}'s with "
               + "$paramCount params")
+logger.warning "INITIALLY ${initialCandidates.size()}"
         pSummaries = paramVals.collect() { param -> valSummary param }
 
         // Cull out candidates based on pTypes
@@ -55,10 +56,14 @@ class Executor {
             List pSTs = ex.genericParameterTypes.collect() { Type type ->
                 toTree type.toString()
             }
-            int i
-            pSTs.find() { pSpecTree ->
-                !compatible(pSummaries[i++], pSpecTree)
-            } ? [:] : [ex, pSTs]
+            int i = -1
+            (null == pSTs.find() { pSpecTree ->
+                boolean isC = compatible pSummaries[++i], pSpecTree
+                if (!isC) logger.warning('Eliminating an Executable due to '
+                  + "(1-based) param #${i+1}\npSpecTree: $pSpecTree\n"
+                  + "Val summary: ${pSummaries[i]}")
+                !isC
+            }) ? [ex, pSTs] : [:]
         }
         logger.log Level.WARNING, "{0} {1}.{2} Candidates: {3}",
           candidates.size(), cl.simpleName, methodName,
@@ -261,33 +266,15 @@ class Executor {
                           "[non-S spec with class specifier: $gSpec")
                 }
                 switch (m.group(1)) {
-                  case 'L':
-                    memberSpec = 'type ' + m.group(2)
-                    break
-                  case 'I':
-                    memberSpec = 'int'
-                    break
-                  case 'J':
-                    memberSpec = 'long'
-                    break
-                  case 'F':
-                    memberSpec = 'float'
-                    break
-                  case 'D':
-                    memberSpec = 'double'
-                    break
-                  case 'B':
-                    memberSpec = 'byte'
-                    break
-                  case 'Z':
-                    memberSpec = 'boolean'
-                    break
-                  case 'S':
-                    memberSpec = 'short'
-                    break
-                  case 'C':
-                    memberSpec = 'char'
-                    break
+                  case 'L': memberSpec = 'type ' + m.group(2); break
+                  case 'I': memberSpec = 'int'; break
+                  case 'J': memberSpec = 'long'; break
+                  case 'F': memberSpec = 'float'; break
+                  case 'D': memberSpec = 'double'; break
+                  case 'B': memberSpec = 'byte'; break
+                  case 'Z': memberSpec = 'boolean'; break
+                  case 'S': memberSpec = 'short'; break
+                  case 'C': memberSpec = 'char'; break
                   default:
                     throw new Error('Unexpected 1-level primitive array type '
                       + "${m.group(1)}: $gSpec")

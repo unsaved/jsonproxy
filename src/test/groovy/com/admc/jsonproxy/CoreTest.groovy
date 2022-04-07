@@ -31,7 +31,7 @@ class CoreTest extends Specification {
         when:
         final String callRet =
           service.staticCall('java.lang.String',
-            'format', '<%s> (%d)', ['werd', 345] as Object[])
+            'format', '<%s> (%d)', ['werd', 345])
 
         then:
         service.size() == 0

@@ -6,6 +6,8 @@
 
 final com.admc.jsonproxy.Service service = new com.admc.jsonproxy.Service()
 //println service.instantiate('one', 'java.lang.String', 'input str')
-println service.staticCall("java.lang.String", "format", "(%s) (%d)", ["werd", 345] as Object[]);
+println service.staticCall("java.lang.String", "format", "(%s) (%d)", ["werd", 345]);
 println service.size()
 println "Size: ${service.size()}"
+
+//println com.admc.jsonproxy.Executor.valSummary(['werd', 345] as Object[])
