@@ -4,13 +4,7 @@ package com.admc.jsonproxy
 
 import groovy.json.JsonSlurper
 import java.util.logging.Level
-import java.lang.reflect.Executable
-import java.lang.reflect.Parameter
-import java.lang.reflect.Constructor
-import java.lang.reflect.Type
-import java.util.regex.Matcher
 import java.util.Collection
-import java.lang.reflect.Array
 
 /**
  * This holds a collection parameter value with metadata.  Supports nesting.
