@@ -15,6 +15,7 @@ import java.util.logging.Level
  *
  * Abbreviations:
  *   S string
+ *   R Runanble (interface)
  *   i int
  *   l long
  *   I Integer
@@ -68,6 +69,10 @@ class SampleMethods {
         logger.fine(strings == null ? '<NULL>'
           : "${strings.size()} List: $strings")
     }
+    static void TR(List<Runnable> runnables) {
+        logger.fine(runnables == null ? '<NULL>'
+          : "${runnables.size()} List: $runnables")
+    }
     static void Tai(List<int[]> stuf) {
         logger.fine(stuf == null ? '<NULL>'
           : "${stuf.size()} List<int[]>: $stuf")
@@ -89,6 +94,10 @@ class SampleMethods {
     static void aS(String[] strings) {
         logger.fine(strings == null ? '<NULL>'
           : "${strings.size()} array: $strings")
+    }
+    static void aR(Runnable[] runnables) {
+        logger.fine(runnables == null ? '<NULL>'
+          : "${runnables.size()} array: $runnables")
     }
     static void ai(int[] ints) {
         logger.fine(ints == null ? '<NULL>' : "${ints.size()} array: $ints")
@@ -137,6 +146,7 @@ class SampleMethods {
 
     static void o(Object o) { logger.fine "isa ${o.getClass().name}: $o" }
     static void S(String S) { logger.fine S }
+    static void R(Runnable R) { logger.fine R }
     static void T(List list) {
         logger.fine(list == null ? '<NULL>' : "${list.size()} List: $list")
     }

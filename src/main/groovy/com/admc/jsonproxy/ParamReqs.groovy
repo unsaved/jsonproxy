@@ -7,6 +7,7 @@ import java.lang.reflect.Type
 import java.util.regex.Matcher
 import java.util.Map
 import java.util.Collection
+import java.lang.reflect.Method
 
 @groovy.util.logging.Log(value = 'logger')
 class ParamReqs {
@@ -24,12 +25,28 @@ class ParamReqs {
         if (sa.size() !== 1)
             throw new IllegalArgumentException(
               'SYNTAX: java com.admc.jsonproxy.ParamReqs pkg.Class.scalarMeth')
+        Class cl
         Matcher m = sa[0] =~ /([\w.]+)[.](\w+)/
         if (!m)
             throw new IllegalArgumentException('Malformatted method spec.\n' +
               'SYNTAX: java com.admc.jsonproxy.ParamReqs pkg.Class.scalarMeth')
-        println(new ParamReqs(Class.forName(m.group(1)).methods.find() {
-          it.name==m.group(2) }.genericParameterTypes[0]))
+        try {
+            cl = Class.forName(m.group(1))
+        } catch (Exception e) {
+            System.err.println "No such class: ${m.group 1}"
+            System.exit 1
+        }
+        Method[] methods = cl.methods.findAll() { it.name==m.group(2) }
+        if (methods.length != 1) {
+            System.err.println "${methods.size()} method smatch ${sa[0]}"
+            System.exit 1
+        }
+        Type[] types = methods[0].genericParameterTypes
+        if (types.size() != 1) {
+            System.err.println "Method ${sa[0]} takes ${types.size()} params"
+            System.exit 1
+        }
+        println(new ParamReqs(types[0]))
     }
 
     String toString(final int level = 0) {
