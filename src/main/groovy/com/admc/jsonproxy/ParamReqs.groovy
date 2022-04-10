@@ -20,33 +20,44 @@ class ParamReqs {
         java.util.logging.LogManager.logManager.updateConfiguration null
     }
 
-
     static void main(String[] sa) {
         if (sa.size() !== 1)
             throw new IllegalArgumentException(
               'SYNTAX: java com.admc.jsonproxy.ParamReqs pkg.Class.scalarMeth')
-        Class cl
         Matcher m = sa[0] =~ /([\w.]+)[.](\w+)/
         if (!m)
             throw new IllegalArgumentException('Malformatted method spec.\n' +
               'SYNTAX: java com.admc.jsonproxy.ParamReqs pkg.Class.scalarMeth')
+        Type type
         try {
-            cl = Class.forName(m.group(1))
+            type = staticSingleParams(m.group(1), m.group(2))
         } catch (Exception e) {
-            System.err.println "No such class: ${m.group 1}"
+            System.err.println e.message
             System.exit 1
         }
-        Method[] methods = cl.methods.findAll() { it.name==m.group(2) }
-        if (methods.length != 1) {
-            System.err.println "${methods.size()} method smatch ${sa[0]}"
-            System.exit 1
+        println(new ParamReqs(type))
+    }
+
+    /**
+     * Returns params for the specified single-parameter static method
+     */
+    static Type staticSingleParams(
+    final String className, final String methName) {
+        final String fullMethName = className + '.' + methName
+        Class cl
+        try {
+            cl = Class.forName(className)
+        } catch (Exception e) {
+            throw new Exception("No such class: $className")
         }
+        Method[] methods = cl.methods.findAll() { it.name==methName }
+        if (methods.length != 1)
+            throw new Exception("${methods.size()} methods match $fullMethName")
         Type[] types = methods[0].genericParameterTypes
-        if (types.size() != 1) {
-            System.err.println "Method ${sa[0]} takes ${types.size()} params"
-            System.exit 1
-        }
-        println(new ParamReqs(types[0]))
+        if (types.size() != 1)
+            throw new Exception(
+              "Method $fullMethName takes ${types.size()} params")
+        types[0]
     }
 
     String toString(final int level = 0) {
