@@ -46,6 +46,17 @@ class SampleMethods {
     static void LaS(Long L, String[] strings) {}
     static void lTS(long l, List<String> strings) {}
     */
+
+    // MONSTER Nestings
+    static void TTTaaaTTI(List<List<List<List<List<Integer>>[][][]>>> stuf) {
+        logger.fine(stuf == null ? '<NULL>'
+          : "${stuf.size()} List<List>: $stuf")
+    }
+    static void TTTaaaTTaai(List<List<List<List<List<int[][]>>[][][]>>> stuf) {
+        logger.fine(stuf == null ? '<NULL>'
+          : "${stuf.size()} List<List>: $stuf")
+    }
+
     static void TTS(List<List<String>> stuf) {
         logger.fine(stuf == null ? '<NULL>'
           : "${stuf.size()} List<List>: $stuf")

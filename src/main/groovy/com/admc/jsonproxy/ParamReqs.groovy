@@ -13,6 +13,12 @@ class ParamReqs {
     private Class clazz
     private ParamReqs leafPR
     private Integer arrayDims
+    static {
+        // Groovy doesn't honor JUL customizations, including
+        // java.util.logging.config.file sysprop, unless you run this:
+        java.util.logging.LogManager.logManager.updateConfiguration null
+    }
+
 
     static void main(String[] sa) {
         if (sa.size() !== 1)
@@ -22,21 +28,22 @@ class ParamReqs {
         if (!m)
             throw new IllegalArgumentException('Malformatted method spec.\n' +
               'SYNTAX: java com.admc.jsonproxy.ParamReqs pkg.Class.scalarMeth')
-        println Class.forName(m.group(1)).methods.find() {
-          it.name==m.group(2) }.genericParameterTypes[0]
+        println(new ParamReqs(Class.forName(m.group(1)).methods.find() {
+          it.name==m.group(2) }.genericParameterTypes[0]))
     }
 
     String toString(final int level = 0) {
-        '  '*level + clazz.name +
+        '  '*level +
+          (clazz==null ? '<ARRAY>': clazz.name) +
           (arrayDims==null ? '' : "[$arrayDims]") +
-          (leafPR == null ? '' : ('\n' + leafPR))
+          (leafPR == null ? '' : ('\n' + leafPR.toString(level+1)))
     }
 
     ParamReqs(Type paramType) {
-        new ParamReqs(paramType.toString())
+        this(paramType.toString())
     }
 
-    private ParamReqs toTree(String gSpec) {
+    private ParamReqs(String gSpec) {
         /* In this parse block, we always set memberSpec, + one case of:
          *    colType set.   Collection (capital 'C')
          *    arrayDims set. array
@@ -51,29 +58,19 @@ class ParamReqs {
               "Failed to parse outer Collection type from: $gSpec")
             colType = m.group 1
             memberSpec = m.group 2
-        /*
-        } else if (gSpec.matches(/\w+ \[\[.*X/)) {
-            // Outermost is an array, common prefix form
-            m = gSpec =~ /\w+ \[(\[.*)/
-            if (!m.matches()) throw new Exception(
-              "Failed to parse outer Collection type from: $gSpec")
-            isArray = true
-            // Nesting arrays only have (optional) leaf types;
-            // If an array nests a Collection then the array nesting ends
-            // there with leaf type of the Collection.
-            // Otherwise 'int[][][][]' means leaf type is int.
-            memberSpec = 'TYPE ' + m.group(1)
-        */
         } else if (gSpec.endsWith('[]')) {
             m = gSpec =~ /(.+?)((?:\[\])+)/
+            if (!m.matches())
+              throw new Exception("Malfomatted []-suffix spec: $gSpec")
             // Outermost is an array, suffix form
-            arrayDims = m.group(1).length()/2
+            arrayDims = m.group(2).length()/2
             //memberSpec = 'TYPE ' + gSpec.substring(0, gSpec.length()-2)
             memberSpec = m.group 1
         } else if (gSpec.contains(' ')) {
+            //m = gSpec =~ /(?:interface|class|TYPE) (.+)/
             m = gSpec =~ /(?:interface|class) (.+)/
             if (!m.matches()) throw new Exception('Got a spec wih space '
-              + /where 1st token is not 'interface' or 'class'/)
+              + "where 1st token is not 'interface' or 'class': $gSpec")
             if (m.group(1).startsWith('[')) {
                 m = m.group(1) =~ /(\[+)([A-Z])(?:(\[?[a-zA-Z_][\w.]*);)?/
                 if (!m.matches()) throw new Exception(
@@ -83,7 +80,8 @@ class ParamReqs {
                     if (m.group(3) == null)
                         throw new Error(
                           "[L spec with no class specifier: $gSpec")
-                    memberSpec = 'TYPE ' + m.group(2)
+                    //memberSpec = 'TYPE ' + m.group(3)
+                    memberSpec = m.group 3
                 } else {
                     if (m.group(3) != null)
                         throw new Error(
@@ -109,7 +107,7 @@ class ParamReqs {
                 if (Map.class.isAssignableFrom(Class.forName(m.group(1))))
                     throw new RuntimeException(
                       "Sorry but Maps not supported yet: ${m.group(1)}")
-                if (!Collection.class.isAssignableFrom(Class.forName(m.group(1)))) {
+                if (Collection.class.isAssignableFrom(Class.forName(m.group(1)))) {
                     colType = m.group 1  // unconstrained Collection
                     memberSpec = 'java.lang.Object'
                 } else {
@@ -141,7 +139,7 @@ class ParamReqs {
           default: assert false:
             "Unexpected plain-word memberSpec: $memberSpec"
         } else if (memberSpec.matches(/[\w.]+$/))
-            clazz = Class.forName colType
+            clazz = Class.forName memberSpec
         else
             leafPR = new ParamReqs(memberSpec)
     }

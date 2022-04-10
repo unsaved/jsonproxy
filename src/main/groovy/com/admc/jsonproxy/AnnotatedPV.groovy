@@ -21,6 +21,12 @@ class AnnotatedPV {
     private AnnotatedPV childAPV
     private Class memberClass
     private boolean isMap
+    
+    static {
+        // Groovy doesn't honor JUL customizations, including
+        // java.util.logging.config.file sysprop, unless you run this:
+        java.util.logging.LogManager.logManager.updateConfiguration null
+    }
 
     String toString() {
         String.format '%s [%d] %s  %s nulls -> %s',
